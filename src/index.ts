@@ -71,7 +71,20 @@ class AtlassianMCPServer {
         config.confluence.apiToken
       );
     } catch (error) {
-      console.error('Failed to initialize Atlassian services:', error);
+      console.error('❌ Failed to initialize Atlassian services');
+      console.error('');
+      console.error('🔧 Please ensure your .env file contains the following variables:');
+      console.error('   - JIRA_BASE_URL (e.g., https://your-domain.atlassian.net)');
+      console.error('   - JIRA_EMAIL (your Atlassian account email)');
+      console.error('   - JIRA_API_TOKEN (your Jira API token)');
+      console.error('   - CONFLUENCE_BASE_URL (e.g., https://your-domain.atlassian.net)');
+      console.error('   - CONFLUENCE_EMAIL (your Atlassian account email)');
+      console.error('   - CONFLUENCE_API_TOKEN (your Confluence API token)');
+      console.error('');
+      console.error('📚 For help getting API tokens, visit:');
+      console.error('   https://id.atlassian.com/manage-profile/security/api-tokens');
+      console.error('');
+      console.error('Original error:', error);
       process.exit(1);
     }
   }
