@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "atlassian-mcp-server": {
+      "type": "stdio",
+      "command": "npm",
+      "args": ["run", "start"]
+    }
+  }
+}
