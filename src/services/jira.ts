@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { JiraTicket, JiraSearchResult, JiraSearchOptions } from '../types/atlassian';
 import { JiraSearchOptionsSchema, JiraSearchResultSchema } from '../schemas/atlassian';
+import * as fs from 'fs';
 
 export class JiraService {
   private client: AxiosInstance;
@@ -23,6 +24,26 @@ export class JiraService {
   }
 
   /**
+   * Convert ISO date string to Jira date format
+   */
+  private formatDateForJira(isoDateString: string): string {
+    try {
+      console.log('Input date string:', isoDateString);
+      const date = new Date(isoDateString);
+      console.log('Parsed date:', date);
+      // Format as YYYY-MM-DD which is one of the accepted Jira formats
+      const isoString = date.toISOString();
+      const datePart = isoString.split('T')[0];
+      console.log('Formatted date for Jira:', datePart);
+      return datePart || isoDateString;
+    } catch (error) {
+      console.log('Date formatting error:', error);
+      // If parsing fails, return the original string and let Jira handle it
+      return isoDateString;
+    }
+  }
+
+  /**
    * Search for Jira tickets based on the provided options
    */
   async searchTickets(options: JiraSearchOptions): Promise<JiraSearchResult> {
@@ -33,10 +54,14 @@ export class JiraService {
     const jqlParts: string[] = [];
 
     if (validatedOptions.assignee) {
+      // Assume assignee is always a complete email address
+      console.log(`Searching for assignee: ${validatedOptions.assignee}`);
       jqlParts.push(`assignee = "${validatedOptions.assignee}"`);
     }
 
     if (validatedOptions.creator) {
+      // Assume creator is always a complete email address
+      console.log(`Searching for creator: ${validatedOptions.creator}`);
       jqlParts.push(`creator = "${validatedOptions.creator}"`);
     }
 
@@ -49,14 +74,31 @@ export class JiraService {
     }
 
     if (validatedOptions.createdAfter) {
-      jqlParts.push(`created >= "${validatedOptions.createdAfter}"`);
+      console.log('Original createdAfter:', validatedOptions.createdAfter);
+      const formattedDate = this.formatDateForJira(validatedOptions.createdAfter);
+      jqlParts.push(`created >= "${formattedDate}"`);
     }
 
     if (validatedOptions.createdBefore) {
-      jqlParts.push(`created <= "${validatedOptions.createdBefore}"`);
+      console.log('Original createdBefore:', validatedOptions.createdBefore);
+      const formattedDate = this.formatDateForJira(validatedOptions.createdBefore);
+      jqlParts.push(`created <= "${formattedDate}"`);
+    }
+
+    if (validatedOptions.updatedAfter) {
+      console.log('Original updatedAfter:', validatedOptions.updatedAfter);
+      const formattedDate = this.formatDateForJira(validatedOptions.updatedAfter);
+      jqlParts.push(`updated >= "${formattedDate}"`);
+    }
+
+    if (validatedOptions.updatedBefore) {
+      console.log('Original updatedBefore:', validatedOptions.updatedBefore);
+      const formattedDate = this.formatDateForJira(validatedOptions.updatedBefore);
+      jqlParts.push(`updated <= "${formattedDate}"`);
     }
 
     const jql = jqlParts.length > 0 ? jqlParts.join(' AND ') : 'order by created DESC';
+    console.log('Final JQL query:', jql);
 
     try {
       const response = await this.client.post('/search', {

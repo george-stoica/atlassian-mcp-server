@@ -2,12 +2,40 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Build and Start Atlassian MCP Server",
+			"label": "Clean Atlassian MCP Server",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"clean"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			]
+		},
+		{
+			"label": "Build Atlassian MCP Server",
 			"type": "shell",
 			"command": "npm",
 			"args": [
 				"run",
 				"build"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			]
+		},
+		{
+			"label": "Start Atlassian MCP Server",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"start"
 			],
 			"group": "build",
 			"isBackground": false,

@@ -4,8 +4,10 @@ import { z } from 'zod';
 export const JiraSearchOptionsSchema = z.object({
   assignee: z.string().optional(),
   creator: z.string().optional(),
-  createdAfter: z.string().datetime().optional(),
-  createdBefore: z.string().datetime().optional(),
+  createdAfter: z.string().optional(),
+  createdBefore: z.string().optional(),
+  updatedAfter: z.string().optional(),
+  updatedBefore: z.string().optional(),
   project: z.string().optional(),
   status: z.string().optional(),
   maxResults: z.number().min(1).max(100).default(50),
@@ -14,7 +16,7 @@ export const JiraSearchOptionsSchema = z.object({
 
 export const JiraTicketFieldsSchema = z.object({
   summary: z.string(),
-  description: z.string().optional(),
+  description: z.any().optional(), // Accept any format for description (string, object, or null)
   status: z.object({
     name: z.string(),
     statusCategory: z.object({
@@ -25,18 +27,18 @@ export const JiraTicketFieldsSchema = z.object({
   assignee: z.object({
     accountId: z.string(),
     displayName: z.string(),
-    emailAddress: z.string(),
-  }).optional(),
+    emailAddress: z.string().optional(),
+  }).optional().nullable(),
   creator: z.object({
     accountId: z.string(),
     displayName: z.string(),
-    emailAddress: z.string(),
-  }),
+    emailAddress: z.string().optional(),
+  }).optional().nullable(),
   reporter: z.object({
     accountId: z.string(),
     displayName: z.string(),
-    emailAddress: z.string(),
-  }),
+    emailAddress: z.string().optional(),
+  }).optional().nullable(),
   created: z.string(),
   updated: z.string(),
   priority: z.object({
@@ -62,7 +64,7 @@ export const JiraTicketSchema = z.object({
 });
 
 export const JiraSearchResultSchema = z.object({
-  expand: z.string(),
+  expand: z.string().optional(),
   startAt: z.number(),
   maxResults: z.number(),
   total: z.number(),

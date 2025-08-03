@@ -4,7 +4,7 @@ export interface JiraTicket {
   self: string;
   fields: {
     summary: string;
-    description?: string;
+    description?: string | object | null;
     status: {
       name: string;
       statusCategory: {
@@ -15,17 +15,17 @@ export interface JiraTicket {
     assignee?: {
       accountId: string;
       displayName: string;
-      emailAddress: string;
-    };
-    creator: {
+      emailAddress?: string;
+    } | null;
+    creator?: {
       accountId: string;
       displayName: string;
-      emailAddress: string;
+      emailAddress?: string;
     };
-    reporter: {
+    reporter?: {
       accountId: string;
       displayName: string;
-      emailAddress: string;
+      emailAddress?: string;
     };
     created: string;
     updated: string;
@@ -58,6 +58,8 @@ export interface JiraSearchOptions {
   creator?: string;
   createdAfter?: string;
   createdBefore?: string;
+  updatedAfter?: string;
+  updatedBefore?: string;
   project?: string;
   status?: string;
   maxResults?: number;

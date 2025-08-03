@@ -156,6 +156,14 @@ class AtlassianMCPServer {
               type: 'string',
               description: 'ISO date string for tickets created before this date',
             },
+            updatedAfter: {
+              type: 'string',
+              description: 'ISO date string for tickets updated after this date',
+            },
+            updatedBefore: {
+              type: 'string',
+              description: 'ISO date string for tickets updated before this date',
+            },
             project: {
               type: 'string',
               description: 'Project key',
