@@ -2,7 +2,128 @@
 
 A Model Context Protocol (MCP) server that provides integration with Atlassian Jira and Confluence. This server allows LLMs to interact with Jira tickets and Confluence pages through structured APIs.
 
-## Features
+## Overview
+
+This MCP server integrates Atlassian Jira and Confluence, providing:
+- JIRA ticket retrieval by assignee, creator, or date range
+- Confluence page search
+- Integration with Jira Cloud Platform REST APIs v3
+- Integration with Confluence REST APIs v2
+
+## MCP Tools
+
+The server provides the following tools:
+
+### Jira Tools
+
+- `search_jira_tickets`: Search tickets with flexible filters (assignee, creator, project, status, created/updated date range)
+- `get_jira_tickets_by_assignee`: Get tickets by assignee with optional date filtering
+- `get_jira_tickets_by_creator`: Get tickets by creator with optional date filtering
+- `get_jira_tickets_in_timeframe`: Get tickets created within a specific time frame
+- `get_ticket_by_key`: Retrieve a specific ticket by key
+
+### Confluence Tools
+
+- `search_confluence_pages`: Search Confluence pages by CQL
+
+## Architecture
+
+### Project Structure
+```
+src/
+├── services/           # Core service classes
+│   ├── jira.ts        # Jira API client (strict types, Zod validation, error handling)
+│   └── confluence.ts  # Confluence API client
+├── types/             # TypeScript type definitions
+│   └── atlassian.ts   # Atlassian API types
+├── schemas/           # Zod validation schemas
+│   └── atlassian.ts   # Input validation
+├── __tests__/         # Unit tests (Jest)
+│   ├── jira.test.ts
+│   ├── confluence.test.ts
+│   └── schemas.test.ts
+└── index.ts           # MCP server entry point
+```
+
+### Key Components
+
+- **JiraService** ([src/services/jira.ts](src/services/jira.ts)): Handles Jira API interactions, including ticket search by assignee, creator, and date range, with strict type checking and Zod validation.
+- **ConfluenceService** ([src/services/confluence.ts](src/services/confluence.ts)): Manages Confluence API calls.
+- **Schema Validation**: Uses Zod for input validation and type safety ([src/schemas/atlassian.ts](src/schemas/atlassian.ts)).
+- **Error Handling**: Comprehensive error handling with meaningful messages.
+- **Testing**: Full unit test coverage for all major functionality ([src/__tests__/](src/__tests__/)).
+
+## Development
+
+### Adding New Features
+
+1. **Add new types** in [`src/types/atlassian.ts`](src/types/atlassian.ts)
+2. **Create validation schemas** in [`src/schemas/atlassian.ts`](src/schemas/atlassian.ts)
+3. **Implement service methods** in respective service classes
+4. **Add MCP tool definitions** in [`src/index.ts`](src/index.ts)
+5. **Write comprehensive tests** in [`src/__tests__/`](src/__tests__/)
+
+### Code Quality
+
+- **TypeScript**: Strict type checking enabled
+- **Testing**: Jest with comprehensive unit tests
+- **Validation**: Zod schemas for all inputs
+- **Error Handling**: Proper error messages and HTTP status codes
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Authentication Errors**
+   - Verify API tokens are correct
+   - Check email addresses match Atlassian accounts
+   - Ensure tokens have sufficient permissions
+
+2. **Connection Issues**
+   - Verify base URLs are correct
+   - Check network connectivity
+   - Confirm Atlassian instance is accessible
+
+3. **Query Errors**
+   - Validate JQL syntax for Jira queries
+   - Check CQL syntax for Confluence searches
+   - Ensure project keys and space keys exist
+
+### Debug Mode
+
+Run in development mode to see detailed error messages:
+```bash
+npm run dev
+```
+
+## Security Considerations
+
+- Store API tokens securely (use environment variables)
+- Never commit tokens to version control
+- Use least-privilege API tokens
+- Regularly rotate API tokens
+- Monitor API usage and rate limits
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make changes with tests
+4. Ensure all tests pass
+5. Submit a pull request
+
+## License
+
+ISC License - see LICENSE file for details.
+
+## Changelog
+
+### v1.0.0
+- Jira ticket search and retrieval
+- Confluence page search functionality
+- Comprehensive test coverage
+- Full MCP server implementation
+- Documentation and examples
 
 ### Jira Integration
 - **Search tickets by assignee** - Retrieve tickets assigned to specific users
