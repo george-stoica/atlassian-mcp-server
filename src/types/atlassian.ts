@@ -29,10 +29,10 @@ export interface JiraTicket {
     };
     created: string;
     updated: string;
-    priority: {
+    priority?: {
       name: string;
       id: string;
-    };
+    } | null;
     issuetype: {
       name: string;
       id: string;
@@ -61,7 +61,16 @@ export interface JiraSearchOptions {
   updatedAfter?: string;
   updatedBefore?: string;
   project?: string;
-  status?: string;
+  status?: string | string[];
+  team?: string;
+  teamIdentifier?: string;
+  summary?: string;
+  description?: string;
+  textSearch?: string;
+  // New flexible search options
+  textSearchTerms?: string[];
+  summaryTerms?: string[];
+  descriptionTerms?: string[];
   maxResults?: number;
   startAt?: number;
 }

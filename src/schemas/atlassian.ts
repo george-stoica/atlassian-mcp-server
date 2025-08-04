@@ -9,7 +9,16 @@ export const JiraSearchOptionsSchema = z.object({
   updatedAfter: z.string().optional(),
   updatedBefore: z.string().optional(),
   project: z.string().optional(),
-  status: z.string().optional(),
+  status: z.union([z.string(), z.array(z.string())]).optional(),
+  team: z.string().optional(),
+  teamIdentifier: z.string().optional(),
+  summary: z.string().optional(),
+  description: z.string().optional(),
+  textSearch: z.string().optional(),
+  // New flexible search options
+  textSearchTerms: z.array(z.string()).optional(),
+  summaryTerms: z.array(z.string()).optional(),
+  descriptionTerms: z.array(z.string()).optional(),
   maxResults: z.number().min(1).max(100).default(50),
   startAt: z.number().min(0).default(0),
 });
@@ -44,7 +53,7 @@ export const JiraTicketFieldsSchema = z.object({
   priority: z.object({
     name: z.string(),
     id: z.string(),
-  }),
+  }).optional().nullable(),
   issuetype: z.object({
     name: z.string(),
     id: z.string(),

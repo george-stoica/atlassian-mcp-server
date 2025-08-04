@@ -16,10 +16,11 @@ The server provides the following tools:
 
 ### Jira Tools
 
-- `search_jira_tickets`: Search tickets with flexible filters (assignee, creator, project, status, created/updated date range)
+- `search_jira_tickets`: Search tickets with flexible filters (assignee, creator, project, status, created/updated date range, text search in summary/description)
 - `get_jira_tickets_by_assignee`: Get tickets by assignee with optional date filtering
 - `get_jira_tickets_by_creator`: Get tickets by creator with optional date filtering
 - `get_jira_tickets_in_timeframe`: Get tickets created within a specific time frame
+- `search_jira_tickets_by_text`: Search for tickets by text in summary or description
 - `get_ticket_by_key`: Retrieve a specific ticket by key
 
 ### Confluence Tools
@@ -225,6 +226,9 @@ Search for Jira tickets with various filters.
 - `createdBefore` (optional): ISO date string for tickets created before this date
 - `project` (optional): Project key
 - `status` (optional): Ticket status
+- `summary` (optional): Text to search for in ticket summaries
+- `description` (optional): Text to search for in ticket descriptions
+- `textSearch` (optional): Text to search for in both summary and description
 - `maxResults` (optional): Maximum number of results (1-100, default: 50)
 - `startAt` (optional): Starting index for pagination (default: 0)
 
@@ -253,6 +257,15 @@ Get tickets created within a specific time frame.
 - `startDate` (required): ISO date string for start of timeframe
 - `endDate` (required): ISO date string for end of timeframe
 - `maxResults` (optional): Maximum results (default: 50)
+
+#### `search_jira_tickets_by_text`
+Search for Jira tickets by text in summary or description.
+
+**Parameters:**
+- `text` (required): Text to search for in both summary and description
+- `project` (optional): Project key to limit search to specific project
+- `status` (optional): Ticket status to filter by
+- `maxResults` (optional): Maximum number of results (default: 50)
 
 ### Confluence Tools
 
@@ -303,6 +316,38 @@ Get direct links to Confluence pages matching a search query.
     "project": "TEST",
     "status": "Open",
     "maxResults": 25
+  }
+}
+
+// Search for tickets containing "database" in summary or description
+{
+  "name": "search_jira_tickets_by_text",
+  "arguments": {
+    "text": "database",
+    "project": "BACKEND",
+    "maxResults": 20
+  }
+}
+
+// Search for "authentication" in both summary and description with advanced filters
+{
+  "name": "search_jira_tickets",
+  "arguments": {
+    "textSearch": "authentication",
+    "project": "SECURITY",
+    "status": "In Progress",
+    "createdAfter": "2024-01-01",
+    "maxResults": 30
+  }
+}
+
+// Search specifically in ticket summaries for "bug fix"
+{
+  "name": "search_jira_tickets",
+  "arguments": {
+    "summary": "bug fix",
+    "project": "FRONTEND",
+    "maxResults": 15
   }
 }
 ```

@@ -64,7 +64,19 @@ export class JiraService {
     }
 
     if (validatedOptions.status) {
-      jqlParts.push(`status = "${validatedOptions.status}"`);
+      if (Array.isArray(validatedOptions.status)) {
+        // Handle multiple statuses
+        const statusList = validatedOptions.status.map(s => `"${s}"`).join(', ');
+        jqlParts.push(`status IN (${statusList})`);
+      } else {
+        // Handle single status
+        jqlParts.push(`status = "${validatedOptions.status}"`);
+      }
+    }
+
+    if (validatedOptions.teamIdentifier) {
+      // Use the specific Team field format
+      jqlParts.push(`"Team[Team]" = "${validatedOptions.teamIdentifier}"`);
     }
 
     if (validatedOptions.createdAfter) {
@@ -85,6 +97,41 @@ export class JiraService {
     if (validatedOptions.updatedBefore) {
       const formattedDate = this.formatDateForJira(validatedOptions.updatedBefore);
       jqlParts.push(`updated <= "${formattedDate}"`);
+    }
+
+    // Handle text search parameters
+    if (validatedOptions.summary) {
+      jqlParts.push(`summary ~ "${validatedOptions.summary}"`);
+    }
+
+    if (validatedOptions.description) {
+      jqlParts.push(`description ~ "${validatedOptions.description}"`);
+    }
+
+    if (validatedOptions.textSearch) {
+      jqlParts.push(`(summary ~ "${validatedOptions.textSearch}" OR description ~ "${validatedOptions.textSearch}")`);
+    }
+
+    // Handle new flexible search parameters
+    if (validatedOptions.textSearchTerms && validatedOptions.textSearchTerms.length > 0) {
+      const textSearchClauses = validatedOptions.textSearchTerms.map(term => 
+        `(summary ~ "${term}" OR description ~ "${term}")`
+      );
+      jqlParts.push(`(${textSearchClauses.join(' OR ')})`);
+    }
+
+    if (validatedOptions.summaryTerms && validatedOptions.summaryTerms.length > 0) {
+      const summarySearchClauses = validatedOptions.summaryTerms.map(term => 
+        `summary ~ "${term}"`
+      );
+      jqlParts.push(`(${summarySearchClauses.join(' OR ')})`);
+    }
+
+    if (validatedOptions.descriptionTerms && validatedOptions.descriptionTerms.length > 0) {
+      const descriptionSearchClauses = validatedOptions.descriptionTerms.map(term => 
+        `description ~ "${term}"`
+      );
+      jqlParts.push(`(${descriptionSearchClauses.join(' OR ')})`);
     }
 
     const jql = jqlParts.length > 0 ? jqlParts.join(' AND ') : 'order by created DESC';

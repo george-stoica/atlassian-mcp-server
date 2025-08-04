@@ -89,6 +89,22 @@ class AtlassianMCPServer {
     }
   }
 
+  /**
+   * Map team name to team identifier using environment variables
+   */
+  private mapTeamNameToIdentifier(teamName: string): string {
+    const teamMappings: Record<string, string> = {
+      'Asia DevOps Team': process.env.DEVOPS_TEAM_ID || '',
+    };
+
+    const teamIdentifier = teamMappings[teamName];
+    if (!teamIdentifier) {
+      throw new Error(`Unknown team: ${teamName}. Available teams: ${Object.keys(teamMappings).join(', ')}`);
+    }
+
+    return teamIdentifier;
+  }
+
   private setupHandlers(): void {
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -115,6 +131,12 @@ class AtlassianMCPServer {
             return await this.handleSearchConfluencePages(args);
           case 'get_confluence_page_links':
             return await this.handleGetConfluencePageLinks(args);
+          case 'get_jira_tickets_by_team_and_status':
+            return await this.handleGetJiraTicketsByTeamAndStatus(args);
+          case 'search_jira_tickets_by_text':
+            return await this.handleSearchJiraTicketsByText(args);
+          case 'search_jira_tickets_flexible':
+            return await this.handleSearchJiraTicketsFlexible(args);
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -170,7 +192,30 @@ class AtlassianMCPServer {
             },
             status: {
               type: 'string',
-              description: 'Ticket status',
+              description: 'Ticket status (single status)',
+            },
+            statuses: {
+              type: 'array',
+              items: {
+                type: 'string'
+              },
+              description: 'Multiple ticket statuses to search for',
+            },
+            team: {
+              type: 'string',
+              description: 'Team name to search for (e.g., "Asia DevOps Team")',
+            },
+            summary: {
+              type: 'string',
+              description: 'Text to search for in ticket summaries',
+            },
+            description: {
+              type: 'string',
+              description: 'Text to search for in ticket descriptions',
+            },
+            textSearch: {
+              type: 'string',
+              description: 'Text to search for in both summary and description',
             },
             maxResults: {
               type: 'number',
@@ -194,6 +239,10 @@ class AtlassianMCPServer {
             assigneeEmail: {
               type: 'string',
               description: 'Email of the assignee',
+            },
+            project: {
+              type: 'string',
+              description: 'Project key to limit search to specific project',
             },
             createdAfter: {
               type: 'string',
@@ -221,6 +270,10 @@ class AtlassianMCPServer {
             creatorEmail: {
               type: 'string',
               description: 'Email of the creator',
+            },
+            project: {
+              type: 'string',
+              description: 'Project key to limit search to specific project',
             },
             createdAfter: {
               type: 'string',
@@ -252,6 +305,10 @@ class AtlassianMCPServer {
             endDate: {
               type: 'string',
               description: 'ISO date string for the end of the time frame',
+            },
+            project: {
+              type: 'string',
+              description: 'Project key to limit search to specific project',
             },
             maxResults: {
               type: 'number',
@@ -319,10 +376,143 @@ class AtlassianMCPServer {
           required: ['query'],
         },
       },
+      {
+        name: 'get_jira_tickets_by_team_and_status',
+        description: 'Get Jira tickets for a specific team with specific statuses',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            team: {
+              type: 'string',
+              description: 'Team name to search for (e.g., "Asia DevOps Team")',
+            },
+            statuses: {
+              type: 'array',
+              items: {
+                type: 'string'
+              },
+              description: 'List of ticket statuses to search for (e.g., ["To Do", "In Progress"])',
+            },
+            project: {
+              type: 'string',
+              description: 'Project key to limit search to specific project',
+            },
+            maxResults: {
+              type: 'number',
+              description: 'Maximum number of results',
+              default: 50,
+            },
+          },
+          required: ['team', 'statuses'],
+        },
+      },
+      {
+        name: 'search_jira_tickets_by_text',
+        description: 'Search for Jira tickets by text in summary or description',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            text: {
+              type: 'string',
+              description: 'Text to search for in both summary and description',
+            },
+            project: {
+              type: 'string',
+              description: 'Project key to limit search to specific project',
+            },
+            status: {
+              type: 'string',
+              description: 'Ticket status to filter by',
+            },
+            maxResults: {
+              type: 'number',
+              description: 'Maximum number of results',
+              default: 50,
+            },
+          },
+          required: ['text'],
+        },
+      },
+      {
+        name: 'search_jira_tickets_flexible',
+        description: 'Search for Jira tickets with flexible text search supporting multiple terms with OR logic',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            project: {
+              type: 'string',
+              description: 'Project key to limit search to specific project',
+            },
+            status: {
+              type: 'string',
+              description: 'Ticket status to filter by',
+            },
+            textSearchTerms: {
+              type: 'array',
+              items: {
+                type: 'string'
+              },
+              description: 'Array of text terms to search for in both summary and description (OR logic)',
+            },
+            summaryTerms: {
+              type: 'array',
+              items: {
+                type: 'string'
+              },
+              description: 'Array of text terms to search for in summary only (OR logic)',
+            },
+            descriptionTerms: {
+              type: 'array',
+              items: {
+                type: 'string'
+              },
+              description: 'Array of text terms to search for in description only (OR logic)',
+            },
+            assignee: {
+              type: 'string',
+              description: 'Email of the assignee',
+            },
+            creator: {
+              type: 'string',
+              description: 'Email of the creator',
+            },
+            createdAfter: {
+              type: 'string',
+              description: 'ISO date string for tickets created after this date',
+            },
+            createdBefore: {
+              type: 'string',
+              description: 'ISO date string for tickets created before this date',
+            },
+            maxResults: {
+              type: 'number',
+              description: 'Maximum number of results',
+              default: 50,
+            },
+            startAt: {
+              type: 'number',
+              description: 'Starting index for pagination',
+              default: 0,
+            },
+          },
+        },
+      },
     ];
   }
 
   private async handleSearchJiraTickets(args: any) {
+    // Handle both single status and multiple statuses
+    if (args.statuses && !args.status) {
+      args.status = args.statuses;
+    }
+    
+    // Map team name to team identifier if team is provided
+    if (args.team) {
+      const teamIdentifier = this.mapTeamNameToIdentifier(args.team);
+      args.teamIdentifier = teamIdentifier;
+      delete args.team; // Remove the team property since we're using teamIdentifier internally
+    }
+    
     const options = JiraSearchOptionsSchema.parse(args);
     const result = await this.jiraService.searchTickets(options);
 
@@ -337,13 +527,14 @@ class AtlassianMCPServer {
   }
 
   private async handleGetJiraTicketsByAssignee(args: any) {
-    const { assigneeEmail, createdAfter, createdBefore, maxResults } = args;
-    const result = await this.jiraService.getTicketsByAssignee(
-      assigneeEmail,
+    const { assigneeEmail, project, createdAfter, createdBefore, maxResults } = args;
+    const result = await this.jiraService.searchTickets({
+      assignee: assigneeEmail,
+      project,
       createdAfter,
       createdBefore,
-      maxResults
-    );
+      maxResults,
+    });
 
     return {
       content: [
@@ -356,13 +547,14 @@ class AtlassianMCPServer {
   }
 
   private async handleGetJiraTicketsByCreator(args: any) {
-    const { creatorEmail, createdAfter, createdBefore, maxResults } = args;
-    const result = await this.jiraService.getTicketsByCreator(
-      creatorEmail,
+    const { creatorEmail, project, createdAfter, createdBefore, maxResults } = args;
+    const result = await this.jiraService.searchTickets({
+      creator: creatorEmail,
+      project,
       createdAfter,
       createdBefore,
-      maxResults
-    );
+      maxResults,
+    });
 
     return {
       content: [
@@ -375,12 +567,13 @@ class AtlassianMCPServer {
   }
 
   private async handleGetJiraTicketsInTimeframe(args: any) {
-    const { startDate, endDate, maxResults } = args;
-    const result = await this.jiraService.getTicketsInTimeframe(
-      startDate,
-      endDate,
-      maxResults
-    );
+    const { startDate, endDate, project, maxResults } = args;
+    const result = await this.jiraService.searchTickets({
+      createdAfter: startDate,
+      createdBefore: endDate,
+      project,
+      maxResults,
+    });
 
     return {
       content: [
@@ -415,6 +608,63 @@ class AtlassianMCPServer {
         {
           type: 'text',
           text: JSON.stringify({ links }, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleGetJiraTicketsByTeamAndStatus(args: any) {
+    const { team, statuses, project, maxResults } = args;
+    
+    // Map team name to team identifier
+    const teamIdentifier = this.mapTeamNameToIdentifier(team);
+    
+    const result = await this.jiraService.searchTickets({
+      teamIdentifier,
+      status: statuses,
+      project,
+      maxResults,
+    });
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleSearchJiraTicketsByText(args: any) {
+    const { text, project, status, maxResults } = args;
+    
+    const result = await this.jiraService.searchTickets({
+      textSearch: text,
+      project,
+      status,
+      maxResults,
+    });
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async handleSearchJiraTicketsFlexible(args: any) {
+    const options = JiraSearchOptionsSchema.parse(args);
+    const result = await this.jiraService.searchTickets(options);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
         },
       ],
     };
