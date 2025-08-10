@@ -163,10 +163,22 @@ describe('JiraService', () => {
       const result = await jiraService.searchTickets(options);
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/search', {
-        jql: 'created >= "2024-01-01T00:00:00.000Z" AND created <= "2024-01-31T23:59:59.999Z"',
+        jql: 'created >= "2024-01-01" AND created <= "2024-01-31"',
         startAt: 0,
         maxResults: 50,
-        fields: expect.any(Array),
+        fields: [
+          'summary',
+          'description',
+          'status',
+          'assignee',
+          'creator',
+          'reporter',
+          'created',
+          'updated',
+          'priority',
+          'issuetype',
+          'project',
+        ],
         expand: ['renderedFields'],
       });
 
@@ -187,10 +199,22 @@ describe('JiraService', () => {
       const result = await jiraService.searchTickets(options);
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/search', {
-        jql: 'assignee = "john.doe@example.com" AND project = "TEST" AND status = "In Progress" AND created >= "2024-01-01T00:00:00.000Z"',
+        jql: 'assignee = "john.doe@example.com" AND project = "TEST" AND status = "In Progress" AND created >= "2024-01-01"',
         startAt: 0,
         maxResults: 50,
-        fields: expect.any(Array),
+        fields: [
+          'summary',
+          'description',
+          'status',
+          'assignee',
+          'creator',
+          'reporter',
+          'created',
+          'updated',
+          'priority',
+          'issuetype',
+          'project',
+        ],
         expand: ['renderedFields'],
       });
 
@@ -241,7 +265,19 @@ describe('JiraService', () => {
         jql: 'assignee = "john.doe@example.com"',
         startAt: 0,
         maxResults: 50,
-        fields: expect.any(Array),
+        fields: [
+          'summary',
+          'description',
+          'status',
+          'assignee',
+          'creator',
+          'reporter',
+          'created',
+          'updated',
+          'priority',
+          'issuetype',
+          'project',
+        ],
         expand: ['renderedFields'],
       });
 
@@ -259,10 +295,22 @@ describe('JiraService', () => {
       );
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/search', {
-        jql: 'assignee = "john.doe@example.com" AND created >= "2024-01-01T00:00:00.000Z" AND created <= "2024-01-31T23:59:59.999Z"',
+        jql: 'assignee = "john.doe@example.com" AND created >= "2024-01-01" AND created <= "2024-01-31"',
         startAt: 0,
         maxResults: 50,
-        fields: expect.any(Array),
+        fields: [
+          'summary',
+          'description',
+          'status',
+          'assignee',
+          'creator',
+          'reporter',
+          'created',
+          'updated',
+          'priority',
+          'issuetype',
+          'project',
+        ],
         expand: ['renderedFields'],
       });
 
@@ -281,7 +329,19 @@ describe('JiraService', () => {
         jql: 'creator = "jane.smith@example.com"',
         startAt: 0,
         maxResults: 50,
-        fields: expect.any(Array),
+        fields: [
+          'summary',
+          'description',
+          'status',
+          'assignee',
+          'creator',
+          'reporter',
+          'created',
+          'updated',
+          'priority',
+          'issuetype',
+          'project',
+        ],
         expand: ['renderedFields'],
       });
 
@@ -300,10 +360,22 @@ describe('JiraService', () => {
       );
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/search', {
-        jql: 'created >= "2024-01-01T00:00:00.000Z" AND created <= "2024-01-31T23:59:59.999Z"',
+        jql: 'created >= "2024-01-01" AND created <= "2024-01-31"',
         startAt: 0,
         maxResults: 50,
-        fields: expect.any(Array),
+        fields: [
+          'summary',
+          'description',
+          'status',
+          'assignee',
+          'creator',
+          'reporter',
+          'created',
+          'updated',
+          'priority',
+          'issuetype',
+          'project',
+        ],
         expand: ['renderedFields'],
       });
 
