@@ -2,23 +2,31 @@ import { z } from 'zod';
 
 // Jira Schemas
 export const JiraSearchOptionsSchema = z.object({
+  // User/Role filters
   assignee: z.string().optional(),
   creator: z.string().optional(),
+  team: z.string().optional(),
+  teamIdentifier: z.string().optional(),
+  
+  // Project/Status filters
+  project: z.string().optional(),
+  status: z.union([z.string(), z.array(z.string())]).optional(),
+  
+  // Date filters
   createdAfter: z.string().optional(),
   createdBefore: z.string().optional(),
   updatedAfter: z.string().optional(),
   updatedBefore: z.string().optional(),
-  project: z.string().optional(),
-  status: z.union([z.string(), z.array(z.string())]).optional(),
-  team: z.string().optional(),
-  teamIdentifier: z.string().optional(),
-  summary: z.string().optional(),
-  description: z.string().optional(),
+  
+  // Text search options
   textSearch: z.string().optional(),
-  // New flexible search options
+  summarySearch: z.string().optional(),
+  descriptionSearch: z.string().optional(),
   textSearchTerms: z.array(z.string()).optional(),
   summaryTerms: z.array(z.string()).optional(),
   descriptionTerms: z.array(z.string()).optional(),
+  
+  // Pagination
   maxResults: z.number().min(1).max(100).default(50),
   startAt: z.number().min(0).default(0),
 });
@@ -85,44 +93,59 @@ export const ConfluenceSearchOptionsSchema = z.object({
   query: z.string().min(1),
   spaceKey: z.string().optional(),
   type: z.enum(['page', 'blogpost']).default('page'),
+  outputFormat: z.enum(['full', 'links_only']).default('full'),
   limit: z.number().min(1).max(100).default(25),
   start: z.number().min(0).default(0),
 });
 
+export const ConfluenceSearchLinksResultSchema = z.object({
+  links: z.array(z.string()),
+  total: z.number(),
+  start: z.number(),
+  limit: z.number(),
+});
+
 export const ConfluencePageSchema = z.object({
   id: z.string(),
-  type: z.string(),
+  parentId: z.string().nullable(),
+  spaceId: z.string(),
+  ownerId: z.string(),
+  lastOwnerId: z.string().nullable(),
+  createdAt: z.string(),
+  authorId: z.string(),
+  parentType: z.string().nullable(),
   status: z.string(),
   title: z.string(),
+  position: z.any().nullable(),
+  body: z.object({}).optional(),
+  type: z.string().optional(),
   space: z.object({
     id: z.string(),
     key: z.string(),
     name: z.string(),
-  }),
+    type: z.string(),
+  }).optional(),
   version: z.object({
     number: z.number(),
-    when: z.string(),
+    message: z.string(),
+    minorEdit: z.boolean(),
+    authorId: z.string(),
+    createdAt: z.string(),
+    ncsStepVersion: z.any().nullable(),
+    when: z.string().optional(),
     by: z.object({
       type: z.string(),
       accountId: z.string(),
       displayName: z.string(),
-    }),
+    }).optional(),
   }),
   _links: z.object({
+    editui: z.string(),
     webui: z.string(),
-    self: z.string(),
+    edituiv2: z.string(),
+    tinyui: z.string(),
+    self: z.string().optional(),
   }),
-  _expandable: z.object({
-    container: z.string(),
-    metadata: z.string(),
-    operations: z.string(),
-    children: z.string(),
-    restrictions: z.string(),
-    history: z.string(),
-    ancestors: z.string(),
-    body: z.string(),
-    descendants: z.string(),
-  }).optional(),
 });
 
 export const ConfluenceSearchResultSchema = z.object({
@@ -131,9 +154,10 @@ export const ConfluenceSearchResultSchema = z.object({
   limit: z.number(),
   size: z.number(),
   _links: z.object({
-    base: z.string(),
     context: z.string(),
     self: z.string(),
+    next: z.string().optional(),
+    base: z.string().optional(),
   }),
 });
 

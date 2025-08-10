@@ -54,72 +54,69 @@ export interface JiraSearchResult {
 }
 
 export interface JiraSearchOptions {
+  // User/Role filters
   assignee?: string;
   creator?: string;
+  team?: string;
+  teamIdentifier?: string;
+  
+  // Project/Status filters
+  project?: string;
+  status?: string | string[];
+  
+  // Date filters
   createdAfter?: string;
   createdBefore?: string;
   updatedAfter?: string;
   updatedBefore?: string;
-  project?: string;
-  status?: string | string[];
-  team?: string;
-  teamIdentifier?: string;
-  summary?: string;
-  description?: string;
+  
+  // Text search options
   textSearch?: string;
-  // New flexible search options
+  summarySearch?: string;
+  descriptionSearch?: string;
   textSearchTerms?: string[];
   summaryTerms?: string[];
   descriptionTerms?: string[];
+  
+  // Pagination
   maxResults?: number;
   startAt?: number;
 }
 
 export interface ConfluencePage {
   id: string;
-  type: string;
+  parentId: string | null;
+  spaceId: string;
+  ownerId: string;
+  lastOwnerId: string | null;
+  createdAt: string;
+  authorId: string;
+  parentType: string | null;
   status: string;
   title: string;
-  space: {
-    id: string;
-    key: string;
-    name: string;
-  };
+  position?: any | null;
+  body?: {};
   version: {
     number: number;
-    when: string;
-    by: {
-      type: string;
-      accountId: string;
-      displayName: string;
-    };
+    message: string;
+    minorEdit: boolean;
+    authorId: string;
+    createdAt: string;
+    ncsStepVersion?: any | null;
   };
   _links: {
+    editui: string;
     webui: string;
-    self: string;
-  };
-  _expandable?: {
-    container: string;
-    metadata: string;
-    operations: string;
-    children: string;
-    restrictions: string;
-    history: string;
-    ancestors: string;
-    body: string;
-    descendants: string;
+    edituiv2: string;
+    tinyui: string;
   };
 }
 
 export interface ConfluenceSearchResult {
   results: ConfluencePage[];
-  start: number;
-  limit: number;
-  size: number;
   _links: {
+    next?: string;
     base: string;
-    context: string;
-    self: string;
   };
 }
 
@@ -127,8 +124,16 @@ export interface ConfluenceSearchOptions {
   query: string;
   spaceKey?: string;
   type?: 'page' | 'blogpost';
+  outputFormat?: 'full' | 'links_only';
   limit?: number;
   start?: number;
+}
+
+export interface ConfluenceSearchLinksResult {
+  links: string[];
+  total: number;
+  start: number;
+  limit: number;
 }
 
 export interface AtlassianConfig {

@@ -18,53 +18,89 @@ describe('ConfluenceService', () => {
   const mockBaseUrl = 'https://test.atlassian.net';
   const mockEmail = 'test@example.com';
   const mockApiToken = 'test-token';
+  const mockDevopsSpaceKey = 'DEVOPS';
 
   // Mock response data
   const mockConfluencePage: ConfluencePage = {
     id: '123456',
-    type: 'page',
+    parentId: null,
+    spaceId: '98765',
+    ownerId: 'user-123',
+    lastOwnerId: null,
+    createdAt: '2024-01-01T10:00:00.000Z',
+    authorId: 'user-123',
+    parentType: null,
     status: 'current',
     title: 'Test Page Title',
-    space: {
-      id: '98765',
-      key: 'TEST',
-      name: 'Test Space'
-    },
+    position: null,
     version: {
       number: 1,
-      when: '2024-01-01T10:00:00.000Z',
-      by: {
-        type: 'known',
-        accountId: 'user-123',
-        displayName: 'John Doe'
-      }
+      message: 'Initial version',
+      minorEdit: false,
+      authorId: 'user-123',
+      createdAt: '2024-01-01T10:00:00.000Z',
+      ncsStepVersion: null
     },
     _links: {
+      editui: '/pages/edit-v2/123456',
       webui: '/spaces/TEST/pages/123456/Test+Page+Title',
-      self: 'https://test.atlassian.net/wiki/api/v2/pages/123456'
-    },
-    _expandable: {
-      container: '',
-      metadata: '',
-      operations: '',
-      children: '',
-      restrictions: '',
-      history: '',
-      ancestors: '',
-      body: '',
-      descendants: ''
+      edituiv2: '/pages/edit-v2/123456',
+      tinyui: '/x/123456'
     }
   };
 
   const mockSearchResult: ConfluenceSearchResult = {
     results: [mockConfluencePage],
+    _links: {
+      base: 'https://test.atlassian.net/wiki'
+    }
+  };
+
+  // Mock search result with pagination info for API responses
+  const mockApiSearchResult = {
+    results: [{
+      ...mockConfluencePage,
+      type: 'page',
+      space: { 
+        id: '98765',
+        key: 'DEVOPS', 
+        name: 'DevOps Space',
+        type: 'global'
+      },
+      version: {
+        ...mockConfluencePage.version,
+        when: '2024-01-01T10:00:00.000Z',
+        by: { 
+          type: 'user',
+          accountId: 'user-123', 
+          displayName: 'Test User' 
+        }
+      },
+      _links: {
+        ...mockConfluencePage._links,
+        self: 'https://test.atlassian.net/wiki/api/v2/pages/123456'
+      }
+    }],
     start: 0,
     limit: 25,
     size: 1,
     _links: {
-      base: 'https://test.atlassian.net/wiki',
-      context: '',
-      self: 'https://test.atlassian.net/wiki/api/v2/pages'
+      context: 'https://test.atlassian.net/wiki',
+      self: 'https://test.atlassian.net/wiki/api/v2/pages',
+      base: 'https://test.atlassian.net/wiki'
+    }
+  };
+
+  // Mock empty search result
+  const mockEmptyApiSearchResult = {
+    results: [],
+    start: 0,
+    limit: 25,
+    size: 0,
+    _links: {
+      context: 'https://test.atlassian.net/wiki',
+      self: 'https://test.atlassian.net/wiki/api/v2/pages',
+      base: 'https://test.atlassian.net/wiki'
     }
   };
 
@@ -78,7 +114,7 @@ describe('ConfluenceService', () => {
     };
     mockedAxios.create.mockReturnValue(mockAxiosInstance as any);
     
-    confluenceService = new ConfluenceService(mockBaseUrl, mockEmail, mockApiToken);
+    confluenceService = new ConfluenceService(mockBaseUrl, mockEmail, mockApiToken, mockDevopsSpaceKey);
   });
 
   describe('constructor', () => {
@@ -98,7 +134,7 @@ describe('ConfluenceService', () => {
     });
 
     it('should remove trailing slash from baseUrl', () => {
-      new ConfluenceService(`${mockBaseUrl}/`, mockEmail, mockApiToken);
+      new ConfluenceService(`${mockBaseUrl}/`, mockEmail, mockApiToken, mockDevopsSpaceKey);
       
       expect(mockedAxios.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -111,7 +147,7 @@ describe('ConfluenceService', () => {
   describe('searchPages', () => {
     it('should search pages with basic query', async () => {
       const mockAxiosInstance = mockedAxios.create() as jest.Mocked<any>;
-      mockAxiosInstance.get.mockResolvedValue({ data: mockSearchResult });
+      mockAxiosInstance.get.mockResolvedValue({ data: mockApiSearchResult });
 
       const options = {
         query: 'test search',
@@ -123,7 +159,7 @@ describe('ConfluenceService', () => {
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/pages', {
         params: {
-          cql: 'text ~ "test search" AND type = "page"',
+          cql: 'text ~ "test search" AND space.key = "DEVOPS" AND type = "page"',
           limit: 25,
           start: 0,
         },
@@ -134,7 +170,7 @@ describe('ConfluenceService', () => {
 
     it('should search pages with space filter', async () => {
       const mockAxiosInstance = mockedAxios.create() as jest.Mocked<any>;
-      mockAxiosInstance.get.mockResolvedValue({ data: mockSearchResult });
+      mockAxiosInstance.get.mockResolvedValue({ data: mockApiSearchResult });
 
       const options = {
         query: 'test search',
@@ -148,7 +184,7 @@ describe('ConfluenceService', () => {
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/pages', {
         params: {
-          cql: 'text ~ "test search" AND space.key = "TEST" AND type = "page"',
+          cql: 'text ~ "test search" AND space.key = "DEVOPS" AND type = "page"',
           limit: 25,
           start: 0,
         },
@@ -159,7 +195,7 @@ describe('ConfluenceService', () => {
 
     it('should search for blog posts', async () => {
       const mockAxiosInstance = mockedAxios.create() as jest.Mocked<any>;
-      mockAxiosInstance.get.mockResolvedValue({ data: mockSearchResult });
+      mockAxiosInstance.get.mockResolvedValue({ data: mockApiSearchResult });
 
       const options = {
         query: 'blog post search',
@@ -172,7 +208,7 @@ describe('ConfluenceService', () => {
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/pages', {
         params: {
-          cql: 'text ~ "blog post search" AND type = "blogpost"',
+          cql: 'text ~ "blog post search" AND space.key = "DEVOPS" AND type = "blogpost"',
           limit: 10,
           start: 0,
         },
@@ -218,13 +254,13 @@ describe('ConfluenceService', () => {
   describe('searchPagesByText', () => {
     it('should search pages by text query', async () => {
       const mockAxiosInstance = mockedAxios.create() as jest.Mocked<any>;
-      mockAxiosInstance.get.mockResolvedValue({ data: mockSearchResult });
+      mockAxiosInstance.get.mockResolvedValue({ data: mockApiSearchResult });
 
       const result = await confluenceService.searchPagesByText('test query');
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/pages', {
         params: {
-          cql: 'text ~ "test query" AND type = "page"',
+          cql: 'text ~ "test query" AND space.key = "DEVOPS" AND type = "page"',
           limit: 25,
           start: 0,
         },
@@ -233,16 +269,16 @@ describe('ConfluenceService', () => {
       expect(result).toEqual(mockSearchResult);
     });
 
-    it('should search pages by text query with space filter', async () => {
+    it('should search pages by text query with custom limit', async () => {
       const mockAxiosInstance = mockedAxios.create() as jest.Mocked<any>;
-      mockAxiosInstance.get.mockResolvedValue({ data: mockSearchResult });
+      mockAxiosInstance.get.mockResolvedValue({ data: mockApiSearchResult });
 
-      const result = await confluenceService.searchPagesByText('test query', 'TEST');
+      const result = await confluenceService.searchPagesByText('test query', 10);
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/pages', {
         params: {
-          cql: 'text ~ "test query" AND space.key = "TEST" AND type = "page"',
-          limit: 25,
+          cql: 'text ~ "test query" AND space.key = "DEVOPS" AND type = "page"',
+          limit: 10,
           start: 0,
         },
       });
@@ -254,7 +290,7 @@ describe('ConfluenceService', () => {
   describe('getPagesBySpace', () => {
     it('should get pages by space key', async () => {
       const mockAxiosInstance = mockedAxios.create() as jest.Mocked<any>;
-      mockAxiosInstance.get.mockResolvedValue({ data: mockSearchResult });
+      mockAxiosInstance.get.mockResolvedValue({ data: mockApiSearchResult });
 
       const result = await confluenceService.getPagesBySpace('TEST');
 
@@ -271,7 +307,7 @@ describe('ConfluenceService', () => {
 
     it('should get pages by space key with custom limit', async () => {
       const mockAxiosInstance = mockedAxios.create() as jest.Mocked<any>;
-      mockAxiosInstance.get.mockResolvedValue({ data: mockSearchResult });
+      mockAxiosInstance.get.mockResolvedValue({ data: mockApiSearchResult });
 
       const result = await confluenceService.getPagesBySpace('TEST', 50);
 
@@ -317,13 +353,13 @@ describe('ConfluenceService', () => {
   describe('getPageLinks', () => {
     it('should get page links for search query', async () => {
       const mockAxiosInstance = mockedAxios.create() as jest.Mocked<any>;
-      mockAxiosInstance.get.mockResolvedValue({ data: mockSearchResult });
+      mockAxiosInstance.get.mockResolvedValue({ data: mockApiSearchResult });
 
       const result = await confluenceService.getPageLinks('test query');
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/pages', {
         params: {
-          cql: 'text ~ "test query" AND type = "page"',
+          cql: 'text ~ "test query" AND space.key = "DEVOPS" AND type = "page"',
           limit: 25,
           start: 0,
         },
@@ -334,15 +370,15 @@ describe('ConfluenceService', () => {
       ]);
     });
 
-    it('should get page links with space filter', async () => {
+    it('should get page links with custom limit', async () => {
       const mockAxiosInstance = mockedAxios.create() as jest.Mocked<any>;
-      mockAxiosInstance.get.mockResolvedValue({ data: mockSearchResult });
+      mockAxiosInstance.get.mockResolvedValue({ data: mockApiSearchResult });
 
-      const result = await confluenceService.getPageLinks('test query', 'TEST', 10);
+      const result = await confluenceService.getPageLinks('test query', 10);
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/pages', {
         params: {
-          cql: 'text ~ "test query" AND space.key = "TEST" AND type = "page"',
+          cql: 'text ~ "test query" AND space.key = "DEVOPS" AND type = "page"',
           limit: 10,
           start: 0,
         },
@@ -356,11 +392,7 @@ describe('ConfluenceService', () => {
     it('should return empty array when no pages found', async () => {
       const mockAxiosInstance = mockedAxios.create() as jest.Mocked<any>;
       mockAxiosInstance.get.mockResolvedValue({ 
-        data: { 
-          ...mockSearchResult, 
-          results: [], 
-          size: 0 
-        } 
+        data: mockEmptyApiSearchResult
       });
 
       const result = await confluenceService.getPageLinks('nonexistent query');
@@ -400,7 +432,7 @@ describe('ConfluenceService', () => {
         type: 'page'
       });
 
-      expect(query).toBe('text ~ "test search" AND space.key = "TEST" AND type = "page"');
+      expect(query).toBe('text ~ "test search" AND space.key = "DEVOPS" AND type = "page"');
     });
 
     it('should build CQL query without space key', () => {
@@ -411,7 +443,7 @@ describe('ConfluenceService', () => {
         type: 'blogpost'
       });
 
-      expect(query).toBe('text ~ "test search" AND type = "blogpost"');
+      expect(query).toBe('text ~ "test search" AND space.key = "DEVOPS" AND type = "blogpost"');
     });
 
     it('should handle empty query text', () => {
@@ -422,7 +454,7 @@ describe('ConfluenceService', () => {
         type: 'page'
       });
 
-      expect(query).toBe('type = "page"');
+      expect(query).toBe('space.key = "DEVOPS" AND type = "page"');
     });
   });
 });

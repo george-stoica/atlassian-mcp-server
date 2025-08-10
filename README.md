@@ -12,20 +12,16 @@ This MCP server integrates Atlassian Jira and Confluence, providing:
 
 ## MCP Tools
 
-The server provides the following tools:
+The server provides the following consolidated tools:
 
 ### Jira Tools
 
-- `search_jira_tickets`: Search tickets with flexible filters (assignee, creator, project, status, created/updated date range, text search in summary/description)
-- `get_jira_tickets_by_assignee`: Get tickets by assignee with optional date filtering
-- `get_jira_tickets_by_creator`: Get tickets by creator with optional date filtering
-- `get_jira_tickets_in_timeframe`: Get tickets created within a specific time frame
-- `search_jira_tickets_by_text`: Search for tickets by text in summary or description
-- `get_ticket_by_key`: Retrieve a specific ticket by key
+- `search_jira_tickets`: Unified search tool with comprehensive filtering options (assignee, creator, team, project, status, date ranges, flexible text search)
+- `get_jira_ticket`: Retrieve a specific ticket by its key
 
 ### Confluence Tools
 
-- `search_confluence_pages`: Search Confluence pages by CQL
+- `search_confluence_content`: Unified search tool with flexible output options (full details or links only)
 
 ## Architecture
 
@@ -169,6 +165,9 @@ JIRA_API_TOKEN=your-jira-api-token
 CONFLUENCE_BASE_URL=https://your-domain.atlassian.net
 CONFLUENCE_EMAIL=your-email@example.com
 CONFLUENCE_API_TOKEN=your-confluence-api-token
+
+# DevOps Space Configuration
+DEVOPS_SPACE_KEY=DEVOPS
 ```
 
 3. **Build the project:**
@@ -212,80 +211,51 @@ npm run test:coverage
 
 ## MCP Tools
 
-The server provides the following tools:
+The server provides the following consolidated tools:
 
 ### Jira Tools
 
 #### `search_jira_tickets`
-Search for Jira tickets with various filters.
+Unified search tool with comprehensive filtering options for Jira tickets.
 
 **Parameters:**
 - `assignee` (optional): Email of the assignee
 - `creator` (optional): Email of the creator
+- `team` (optional): Team name (e.g., "Asia DevOps Team")
+- `project` (optional): Project key
+- `status` (optional): Single status or array of statuses
 - `createdAfter` (optional): ISO date string for tickets created after this date
 - `createdBefore` (optional): ISO date string for tickets created before this date
-- `project` (optional): Project key
-- `status` (optional): Ticket status
-- `summary` (optional): Text to search for in ticket summaries
-- `description` (optional): Text to search for in ticket descriptions
-- `textSearch` (optional): Text to search for in both summary and description
+- `updatedAfter` (optional): ISO date string for tickets updated after this date
+- `updatedBefore` (optional): ISO date string for tickets updated before this date
+- `textSearch` (optional): Search text in both summary and description
+- `summarySearch` (optional): Search text only in summary
+- `descriptionSearch` (optional): Search text only in description
+- `textSearchTerms` (optional): Array of terms with OR logic for summary and description
+- `summaryTerms` (optional): Array of terms with OR logic for summary only
+- `descriptionTerms` (optional): Array of terms with OR logic for description only
 - `maxResults` (optional): Maximum number of results (1-100, default: 50)
 - `startAt` (optional): Starting index for pagination (default: 0)
 
-#### `get_jira_tickets_by_assignee`
-Get tickets assigned to a specific user.
+#### `get_jira_ticket`
+Retrieve a specific Jira ticket by its key.
 
 **Parameters:**
-- `assigneeEmail` (required): Email of the assignee
-- `createdAfter` (optional): ISO date string
-- `createdBefore` (optional): ISO date string
-- `maxResults` (optional): Maximum results (default: 50)
-
-#### `get_jira_tickets_by_creator`
-Get tickets created by a specific user.
-
-**Parameters:**
-- `creatorEmail` (required): Email of the creator
-- `createdAfter` (optional): ISO date string
-- `createdBefore` (optional): ISO date string
-- `maxResults` (optional): Maximum results (default: 50)
-
-#### `get_jira_tickets_in_timeframe`
-Get tickets created within a specific time frame.
-
-**Parameters:**
-- `startDate` (required): ISO date string for start of timeframe
-- `endDate` (required): ISO date string for end of timeframe
-- `maxResults` (optional): Maximum results (default: 50)
-
-#### `search_jira_tickets_by_text`
-Search for Jira tickets by text in summary or description.
-
-**Parameters:**
-- `text` (required): Text to search for in both summary and description
-- `project` (optional): Project key to limit search to specific project
-- `status` (optional): Ticket status to filter by
-- `maxResults` (optional): Maximum number of results (default: 50)
+- `ticketKey` (required): Jira ticket key (e.g., "PROJ-123")
 
 ### Confluence Tools
 
-#### `search_confluence_pages`
-Search for Confluence pages based on text query.
+#### `search_confluence_content`
+Unified search tool for Confluence content in the DevOps space only.
 
 **Parameters:**
 - `query` (required): Text to search for in pages
-- `spaceKey` (optional): Space key to limit search
 - `type` (optional): 'page' or 'blogpost' (default: 'page')
-- `limit` (optional): Maximum results (1-100, default: 25)
+- `outputFormat` (optional): 'full' or 'links_only' (default: 'full')
+- `limit` (optional): Maximum number of results (1-100, default: 25)
 - `start` (optional): Starting index for pagination (default: 0)
 
-#### `get_confluence_page_links`
-Get direct links to Confluence pages matching a search query.
-
-**Parameters:**
-- `query` (required): Text to search for
-- `spaceKey` (optional): Space key to limit search
-- `limit` (optional): Maximum results (default: 25)
+**Note:** All searches are automatically restricted to the DevOps space as configured by the `DEVOPS_SPACE_KEY` environment variable.
 
 ## Example Queries
 
@@ -294,42 +264,42 @@ Get direct links to Confluence pages matching a search query.
 ```json
 // Get all tickets assigned to john.doe@example.com
 {
-  "name": "get_jira_tickets_by_assignee",
+  "name": "search_jira_tickets",
   "arguments": {
-    "assigneeEmail": "john.doe@example.com"
+    "assignee": "john.doe@example.com"
   }
 }
 
 // Get tickets created in January 2024
 {
-  "name": "get_jira_tickets_in_timeframe",
+  "name": "search_jira_tickets",
   "arguments": {
-    "startDate": "2024-01-01T00:00:00.000Z",
-    "endDate": "2024-01-31T23:59:59.999Z"
+    "createdAfter": "2024-01-01T00:00:00.000Z",
+    "createdBefore": "2024-01-31T23:59:59.999Z"
   }
 }
 
-// Search for high priority bugs in the TEST project
+// Search for tickets by creator with date filtering
 {
   "name": "search_jira_tickets",
   "arguments": {
-    "project": "TEST",
-    "status": "Open",
+    "creator": "jane.smith@example.com",
+    "createdAfter": "2024-01-01",
     "maxResults": 25
   }
 }
 
 // Search for tickets containing "database" in summary or description
 {
-  "name": "search_jira_tickets_by_text",
+  "name": "search_jira_tickets",
   "arguments": {
-    "text": "database",
+    "textSearch": "database",
     "project": "BACKEND",
     "maxResults": 20
   }
 }
 
-// Search for "authentication" in both summary and description with advanced filters
+// Search for "authentication" with advanced filters
 {
   "name": "search_jira_tickets",
   "arguments": {
@@ -345,9 +315,37 @@ Get direct links to Confluence pages matching a search query.
 {
   "name": "search_jira_tickets",
   "arguments": {
-    "summary": "bug fix",
+    "summarySearch": "bug fix",
     "project": "FRONTEND",
     "maxResults": 15
+  }
+}
+
+// Search with multiple terms using OR logic
+{
+  "name": "search_jira_tickets",
+  "arguments": {
+    "textSearchTerms": ["performance", "optimization", "slow"],
+    "project": "BACKEND",
+    "status": ["To Do", "In Progress"]
+  }
+}
+
+// Search by team and status
+{
+  "name": "search_jira_tickets",
+  "arguments": {
+    "team": "Asia DevOps Team",
+    "status": ["To Do", "In Progress"],
+    "maxResults": 50
+  }
+}
+
+// Get a specific ticket by key
+{
+  "name": "get_jira_ticket",
+  "arguments": {
+    "ticketKey": "PROJ-123"
   }
 }
 ```
@@ -355,21 +353,31 @@ Get direct links to Confluence pages matching a search query.
 ### Confluence Examples
 
 ```json
-// Search for pages about "API documentation"
+// Search for pages about "API documentation" in DevOps space
 {
-  "name": "search_confluence_pages",
+  "name": "search_confluence_content",
   "arguments": {
     "query": "API documentation"
   }
 }
 
-// Get links to pages about "user guide" in the DOCS space
+// Get only links to pages about "user guide" in DevOps space
 {
-  "name": "get_confluence_page_links",
+  "name": "search_confluence_content",
   "arguments": {
     "query": "user guide",
-    "spaceKey": "DOCS",
+    "outputFormat": "links_only",
     "limit": 10
+  }
+}
+
+// Search for blog posts about "release notes" in DevOps space
+{
+  "name": "search_confluence_content",
+  "arguments": {
+    "query": "release notes",
+    "type": "blogpost",
+    "limit": 15
   }
 }
 ```
@@ -465,6 +473,36 @@ npm run dev
 ISC License - see LICENSE file for details.
 
 ## Changelog
+
+### v2.1.0 (DevOps Space Restriction)
+- **BREAKING CHANGE**: Confluence searches now restricted to DevOps space only
+- **Confluence Tools**:
+  - Removed `spaceKey` parameter from `search_confluence_content` tool
+  - All searches automatically filtered to DevOps space via `DEVOPS_SPACE_KEY` environment variable
+  - Updated tool description to clarify DevOps space restriction
+- **Configuration**:
+  - Added `DEVOPS_SPACE_KEY` environment variable (defaults to "DEVOPS")
+  - Updated error messages to include new environment variable requirement
+- **Benefits**:
+  - Simplified API by removing unnecessary parameter
+  - Ensures consistent search scope for DevOps team
+  - Improved security by restricting access to specific space
+
+### v2.0.0 (Refactored Release)
+- **BREAKING CHANGES**: Consolidated 9 tools into 3 unified tools
+- **Jira Tools**: 
+  - Replaced 7 redundant tools with single `search_jira_tickets` tool
+  - Added new `get_jira_ticket` tool for single ticket retrieval
+  - Enhanced text search with flexible options (summary-only, description-only, multiple terms with OR logic)
+  - Improved team-based filtering
+- **Confluence Tools**:
+  - Consolidated 2 tools into single `search_confluence_content` tool
+  - Added flexible output format (full details vs links only)
+- **Benefits**:
+  - 67% reduction in tool count (9 → 3)
+  - Improved maintainability and consistency
+  - Enhanced functionality with new search capabilities
+  - Cleaner API surface
 
 ### v1.0.0 (Initial Release)
 - Jira ticket search and retrieval

@@ -100,12 +100,12 @@ export class JiraService {
     }
 
     // Handle text search parameters
-    if (validatedOptions.summary) {
-      jqlParts.push(`summary ~ "${validatedOptions.summary}"`);
+    if (validatedOptions.summarySearch) {
+      jqlParts.push(`summary ~ "${validatedOptions.summarySearch}"`);
     }
 
-    if (validatedOptions.description) {
-      jqlParts.push(`description ~ "${validatedOptions.description}"`);
+    if (validatedOptions.descriptionSearch) {
+      jqlParts.push(`description ~ "${validatedOptions.descriptionSearch}"`);
     }
 
     if (validatedOptions.textSearch) {

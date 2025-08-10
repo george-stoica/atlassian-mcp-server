@@ -1,13 +1,15 @@
 import axios, { AxiosInstance } from 'axios';
-import { ConfluencePage, ConfluenceSearchResult, ConfluenceSearchOptions } from '../types/atlassian';
-import { ConfluenceSearchOptionsSchema, ConfluenceSearchResultSchema } from '../schemas/atlassian';
+import { ConfluencePage, ConfluenceSearchResult, ConfluenceSearchOptions, ConfluenceSearchLinksResult } from '../types/atlassian';
+import { ConfluenceSearchOptionsSchema, ConfluenceSearchResultSchema, ConfluenceSearchLinksResultSchema } from '../schemas/atlassian';
 
 export class ConfluenceService {
   private client: AxiosInstance;
   private baseUrl: string;
+  private devopsSpaceKey: string;
 
-  constructor(baseUrl: string, email: string, apiToken: string) {
+  constructor(baseUrl: string, email: string, apiToken: string, devopsSpaceKey: string) {
     this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
+    this.devopsSpaceKey = devopsSpaceKey;
     this.client = axios.create({
       baseURL: `${this.baseUrl}/wiki/api/v2`,
       auth: {
@@ -25,7 +27,7 @@ export class ConfluenceService {
   /**
    * Search for Confluence pages based on the provided options
    */
-  async searchPages(options: ConfluenceSearchOptions): Promise<ConfluenceSearchResult> {
+  async searchPages(options: ConfluenceSearchOptions): Promise<ConfluenceSearchResult | ConfluenceSearchLinksResult> {
     // Validate input
     const validatedOptions = ConfluenceSearchOptionsSchema.parse(options);
 
@@ -39,8 +41,28 @@ export class ConfluenceService {
       const response = await this.client.get('/pages', { params });
 
       // Validate response
-      const result = ConfluenceSearchResultSchema.parse(response.data);
-      return result as ConfluenceSearchResult;
+      const apiResult = ConfluenceSearchResultSchema.parse(response.data);
+
+      // Return different formats based on outputFormat
+      if (validatedOptions.outputFormat === 'links_only') {
+        const links = apiResult.results.map(page => `${this.baseUrl}${page._links.webui}`);
+        return {
+          links,
+          total: apiResult.results.length,
+          start: validatedOptions.start,
+          limit: validatedOptions.limit,
+        };
+      }
+
+      // Transform API response to expected return type
+      const searchResult: ConfluenceSearchResult = {
+        results: apiResult.results,
+        _links: {
+          base: apiResult._links.base || `${this.baseUrl}/wiki`
+        }
+      };
+
+      return searchResult;
     } catch (error) {
       if (axios.isAxiosError(error)) {
         throw new Error(`Confluence API error: ${error.response?.status} - ${error.response?.data?.message || error.message}`);
@@ -50,15 +72,16 @@ export class ConfluenceService {
   }
 
   /**
-   * Search for pages by text query
+   * Search for pages by text query in the DevOps space
    */
-  async searchPagesByText(query: string, spaceKey?: string, limit = 25): Promise<ConfluenceSearchResult> {
-    return this.searchPages({
+  async searchPagesByText(query: string, limit = 25): Promise<ConfluenceSearchResult> {
+    const result = await this.searchPages({
       query,
-      spaceKey,
       type: 'page',
+      outputFormat: 'full',
       limit,
     });
+    return result as ConfluenceSearchResult;
   }
 
   /**
@@ -75,8 +98,17 @@ export class ConfluenceService {
       const response = await this.client.get('/pages', { params });
 
       // Validate response
-      const result = ConfluenceSearchResultSchema.parse(response.data);
-      return result as ConfluenceSearchResult;
+      const apiResult = ConfluenceSearchResultSchema.parse(response.data);
+      
+      // Transform API response to expected return type
+      const searchResult: ConfluenceSearchResult = {
+        results: apiResult.results,
+        _links: {
+          base: apiResult._links.base || `${this.baseUrl}/wiki`
+        }
+      };
+
+      return searchResult;
     } catch (error) {
       if (axios.isAxiosError(error)) {
         throw new Error(`Confluence API error: ${error.response?.status} - ${error.response?.data?.message || error.message}`);
@@ -101,10 +133,10 @@ export class ConfluenceService {
   }
 
   /**
-   * Get page links for pages matching a query
+   * Get page links for pages matching a query in the DevOps space
    */
-  async getPageLinks(query: string, spaceKey?: string, limit = 25): Promise<string[]> {
-    const searchResult = await this.searchPagesByText(query, spaceKey, limit);
+  async getPageLinks(query: string, limit = 25): Promise<string[]> {
+    const searchResult = await this.searchPagesByText(query, limit);
     
     return searchResult.results.map(page => {
       // Construct the full URL using the webui link
@@ -126,6 +158,7 @@ export class ConfluenceService {
 
   /**
    * Build CQL (Confluence Query Language) query from search options
+   * Always uses the DevOps space key
    */
   private buildCQLQuery(options: ConfluenceSearchOptions): string {
     const conditions: string[] = [];
@@ -135,10 +168,8 @@ export class ConfluenceService {
       conditions.push(`text ~ "${options.query.trim()}"`);
     }
 
-    // Add space filter if specified
-    if (options.spaceKey) {
-      conditions.push(`space.key = "${options.spaceKey}"`);
-    }
+    // Always use the DevOps space key
+    conditions.push(`space.key = "${this.devopsSpaceKey}"`);
 
     // Add type filter
     conditions.push(`type = "${options.type}"`);

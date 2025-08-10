@@ -14,7 +14,6 @@ import { AtlassianConfigSchema } from './schemas/atlassian.js';
 import { 
   JiraSearchOptionsSchema, 
   ConfluenceSearchOptionsSchema,
-  type ConfluenceSearchOptions
 } from './schemas/atlassian.js';
 import type { ConfluenceSearchOptions as ConfluenceSearchOptionsType } from './types/atlassian.js';
 
@@ -68,7 +67,8 @@ class AtlassianMCPServer {
       this.confluenceService = new ConfluenceService(
         config.confluence.baseUrl,
         config.confluence.email,
-        config.confluence.apiToken
+        config.confluence.apiToken,
+        process.env.DEVOPS_SPACE_KEY || 'DEVOPS'
       );
     } catch (error) {
       console.error('❌ Failed to initialize Atlassian services');
@@ -80,6 +80,7 @@ class AtlassianMCPServer {
       console.error('   - CONFLUENCE_BASE_URL (e.g., https://your-domain.atlassian.net)');
       console.error('   - CONFLUENCE_EMAIL (your Atlassian account email)');
       console.error('   - CONFLUENCE_API_TOKEN (your Confluence API token)');
+      console.error('   - DEVOPS_SPACE_KEY (your DevOps space key, e.g., DEVOPS)');
       console.error('');
       console.error('📚 For help getting API tokens, visit:');
       console.error('   https://id.atlassian.com/manage-profile/security/api-tokens');
@@ -121,22 +122,10 @@ class AtlassianMCPServer {
         switch (name) {
           case 'search_jira_tickets':
             return await this.handleSearchJiraTickets(args);
-          case 'get_jira_tickets_by_assignee':
-            return await this.handleGetJiraTicketsByAssignee(args);
-          case 'get_jira_tickets_by_creator':
-            return await this.handleGetJiraTicketsByCreator(args);
-          case 'get_jira_tickets_in_timeframe':
-            return await this.handleGetJiraTicketsInTimeframe(args);
-          case 'search_confluence_pages':
-            return await this.handleSearchConfluencePages(args);
-          case 'get_confluence_page_links':
-            return await this.handleGetConfluencePageLinks(args);
-          case 'get_jira_tickets_by_team_and_status':
-            return await this.handleGetJiraTicketsByTeamAndStatus(args);
-          case 'search_jira_tickets_by_text':
-            return await this.handleSearchJiraTicketsByText(args);
-          case 'search_jira_tickets_flexible':
-            return await this.handleSearchJiraTicketsFlexible(args);
+          case 'get_jira_ticket':
+            return await this.handleGetJiraTicket(args);
+          case 'search_confluence_content':
+            return await this.handleSearchConfluenceContent(args);
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -158,10 +147,11 @@ class AtlassianMCPServer {
     return [
       {
         name: 'search_jira_tickets',
-        description: 'Search for Jira tickets with various filters',
+        description: 'Search for Jira tickets with comprehensive filtering options',
         inputSchema: {
           type: 'object',
           properties: {
+            // User/Role filters
             assignee: {
               type: 'string',
               description: 'Email of the assignee',
@@ -170,6 +160,25 @@ class AtlassianMCPServer {
               type: 'string',
               description: 'Email of the creator',
             },
+            team: {
+              type: 'string',
+              description: 'Team name to search for (e.g., "Asia DevOps Team")',
+            },
+            
+            // Project/Status filters
+            project: {
+              type: 'string',
+              description: 'Project key',
+            },
+            status: {
+              oneOf: [
+                { type: 'string' },
+                { type: 'array', items: { type: 'string' } }
+              ],
+              description: 'Single status or array of statuses',
+            },
+            
+            // Date filters
             createdAfter: {
               type: 'string',
               description: 'ISO date string for tickets created after this date',
@@ -186,326 +195,111 @@ class AtlassianMCPServer {
               type: 'string',
               description: 'ISO date string for tickets updated before this date',
             },
-            project: {
-              type: 'string',
-              description: 'Project key',
-            },
-            status: {
-              type: 'string',
-              description: 'Ticket status (single status)',
-            },
-            statuses: {
-              type: 'array',
-              items: {
-                type: 'string'
-              },
-              description: 'Multiple ticket statuses to search for',
-            },
-            team: {
-              type: 'string',
-              description: 'Team name to search for (e.g., "Asia DevOps Team")',
-            },
-            summary: {
-              type: 'string',
-              description: 'Text to search for in ticket summaries',
-            },
-            description: {
-              type: 'string',
-              description: 'Text to search for in ticket descriptions',
-            },
+            
+            // Text search options
             textSearch: {
               type: 'string',
-              description: 'Text to search for in both summary and description',
+              description: 'Search text in both summary and description',
             },
+            summarySearch: {
+              type: 'string',
+              description: 'Search text only in summary',
+            },
+            descriptionSearch: {
+              type: 'string',
+              description: 'Search text only in description',
+            },
+            textSearchTerms: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Multiple terms with OR logic for summary and description',
+            },
+            summaryTerms: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Multiple terms with OR logic for summary only',
+            },
+            descriptionTerms: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Multiple terms with OR logic for description only',
+            },
+            
+            // Pagination
             maxResults: {
               type: 'number',
-              description: 'Maximum number of results (1-100)',
+              minimum: 1,
+              maximum: 100,
               default: 50,
+              description: 'Maximum number of results (1-100)',
             },
             startAt: {
               type: 'number',
-              description: 'Starting index for pagination',
+              minimum: 0,
               default: 0,
+              description: 'Starting index for pagination',
             },
           },
         },
       },
       {
-        name: 'get_jira_tickets_by_assignee',
-        description: 'Get Jira tickets assigned to a specific user with optional date filtering',
+        name: 'get_jira_ticket',
+        description: 'Get a specific Jira ticket by its key',
         inputSchema: {
           type: 'object',
           properties: {
-            assigneeEmail: {
+            ticketKey: {
               type: 'string',
-              description: 'Email of the assignee',
-            },
-            project: {
-              type: 'string',
-              description: 'Project key to limit search to specific project',
-            },
-            createdAfter: {
-              type: 'string',
-              description: 'ISO date string for tickets created after this date',
-            },
-            createdBefore: {
-              type: 'string',
-              description: 'ISO date string for tickets created before this date',
-            },
-            maxResults: {
-              type: 'number',
-              description: 'Maximum number of results',
-              default: 50,
+              description: 'Jira ticket key (e.g., "PROJ-123")',
+              pattern: '^[A-Z]+-[0-9]+$',
             },
           },
-          required: ['assigneeEmail'],
+          required: ['ticketKey'],
         },
       },
       {
-        name: 'get_jira_tickets_by_creator',
-        description: 'Get Jira tickets created by a specific user with optional date filtering',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            creatorEmail: {
-              type: 'string',
-              description: 'Email of the creator',
-            },
-            project: {
-              type: 'string',
-              description: 'Project key to limit search to specific project',
-            },
-            createdAfter: {
-              type: 'string',
-              description: 'ISO date string for tickets created after this date',
-            },
-            createdBefore: {
-              type: 'string',
-              description: 'ISO date string for tickets created before this date',
-            },
-            maxResults: {
-              type: 'number',
-              description: 'Maximum number of results',
-              default: 50,
-            },
-          },
-          required: ['creatorEmail'],
-        },
-      },
-      {
-        name: 'get_jira_tickets_in_timeframe',
-        description: 'Get Jira tickets created within a specific time frame',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            startDate: {
-              type: 'string',
-              description: 'ISO date string for the start of the time frame',
-            },
-            endDate: {
-              type: 'string',
-              description: 'ISO date string for the end of the time frame',
-            },
-            project: {
-              type: 'string',
-              description: 'Project key to limit search to specific project',
-            },
-            maxResults: {
-              type: 'number',
-              description: 'Maximum number of results',
-              default: 50,
-            },
-          },
-          required: ['startDate', 'endDate'],
-        },
-      },
-      {
-        name: 'search_confluence_pages',
-        description: 'Search for Confluence pages based on text query',
+        name: 'search_confluence_content',
+        description: 'Search for Confluence content in the DevOps space only',
         inputSchema: {
           type: 'object',
           properties: {
             query: {
               type: 'string',
               description: 'Text to search for in pages',
-            },
-            spaceKey: {
-              type: 'string',
-              description: 'Space key to limit search to specific space',
             },
             type: {
               type: 'string',
               enum: ['page', 'blogpost'],
-              description: 'Type of content to search for',
               default: 'page',
+              description: 'Type of content to search for',
+            },
+            outputFormat: {
+              type: 'string',
+              enum: ['full', 'links_only'],
+              default: 'full',
+              description: 'Return full page details or just links',
             },
             limit: {
               type: 'number',
-              description: 'Maximum number of results',
+              minimum: 1,
+              maximum: 100,
               default: 25,
+              description: 'Maximum number of results',
             },
             start: {
               type: 'number',
-              description: 'Starting index for pagination',
+              minimum: 0,
               default: 0,
+              description: 'Starting index for pagination',
             },
           },
           required: ['query'],
-        },
-      },
-      {
-        name: 'get_confluence_page_links',
-        description: 'Get links to Confluence pages based on a search query',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            query: {
-              type: 'string',
-              description: 'Text to search for in pages',
-            },
-            spaceKey: {
-              type: 'string',
-              description: 'Space key to limit search to specific space',
-            },
-            limit: {
-              type: 'number',
-              description: 'Maximum number of results',
-              default: 25,
-            },
-          },
-          required: ['query'],
-        },
-      },
-      {
-        name: 'get_jira_tickets_by_team_and_status',
-        description: 'Get Jira tickets for a specific team with specific statuses',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            team: {
-              type: 'string',
-              description: 'Team name to search for (e.g., "Asia DevOps Team")',
-            },
-            statuses: {
-              type: 'array',
-              items: {
-                type: 'string'
-              },
-              description: 'List of ticket statuses to search for (e.g., ["To Do", "In Progress"])',
-            },
-            project: {
-              type: 'string',
-              description: 'Project key to limit search to specific project',
-            },
-            maxResults: {
-              type: 'number',
-              description: 'Maximum number of results',
-              default: 50,
-            },
-          },
-          required: ['team', 'statuses'],
-        },
-      },
-      {
-        name: 'search_jira_tickets_by_text',
-        description: 'Search for Jira tickets by text in summary or description',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            text: {
-              type: 'string',
-              description: 'Text to search for in both summary and description',
-            },
-            project: {
-              type: 'string',
-              description: 'Project key to limit search to specific project',
-            },
-            status: {
-              type: 'string',
-              description: 'Ticket status to filter by',
-            },
-            maxResults: {
-              type: 'number',
-              description: 'Maximum number of results',
-              default: 50,
-            },
-          },
-          required: ['text'],
-        },
-      },
-      {
-        name: 'search_jira_tickets_flexible',
-        description: 'Search for Jira tickets with flexible text search supporting multiple terms with OR logic',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            project: {
-              type: 'string',
-              description: 'Project key to limit search to specific project',
-            },
-            status: {
-              type: 'string',
-              description: 'Ticket status to filter by',
-            },
-            textSearchTerms: {
-              type: 'array',
-              items: {
-                type: 'string'
-              },
-              description: 'Array of text terms to search for in both summary and description (OR logic)',
-            },
-            summaryTerms: {
-              type: 'array',
-              items: {
-                type: 'string'
-              },
-              description: 'Array of text terms to search for in summary only (OR logic)',
-            },
-            descriptionTerms: {
-              type: 'array',
-              items: {
-                type: 'string'
-              },
-              description: 'Array of text terms to search for in description only (OR logic)',
-            },
-            assignee: {
-              type: 'string',
-              description: 'Email of the assignee',
-            },
-            creator: {
-              type: 'string',
-              description: 'Email of the creator',
-            },
-            createdAfter: {
-              type: 'string',
-              description: 'ISO date string for tickets created after this date',
-            },
-            createdBefore: {
-              type: 'string',
-              description: 'ISO date string for tickets created before this date',
-            },
-            maxResults: {
-              type: 'number',
-              description: 'Maximum number of results',
-              default: 50,
-            },
-            startAt: {
-              type: 'number',
-              description: 'Starting index for pagination',
-              default: 0,
-            },
-          },
         },
       },
     ];
   }
 
   private async handleSearchJiraTickets(args: any) {
-    // Handle both single status and multiple statuses
-    if (args.statuses && !args.status) {
-      args.status = args.statuses;
-    }
-    
     // Map team name to team identifier if team is provided
     if (args.team) {
       const teamIdentifier = this.mapTeamNameToIdentifier(args.team);
@@ -526,15 +320,20 @@ class AtlassianMCPServer {
     };
   }
 
-  private async handleGetJiraTicketsByAssignee(args: any) {
-    const { assigneeEmail, project, createdAfter, createdBefore, maxResults } = args;
-    const result = await this.jiraService.searchTickets({
-      assignee: assigneeEmail,
-      project,
-      createdAfter,
-      createdBefore,
-      maxResults,
-    });
+  private async handleGetJiraTicket(args: any) {
+    const { ticketKey } = args;
+    
+    if (!ticketKey) {
+      throw new Error('ticketKey is required');
+    }
+
+    // Validate ticket key format
+    const ticketKeyPattern = /^[A-Z]+-[0-9]+$/;
+    if (!ticketKeyPattern.test(ticketKey)) {
+      throw new Error('Invalid ticket key format. Expected format: PROJ-123');
+    }
+
+    const result = await this.jiraService.getTicketByKey(ticketKey);
 
     return {
       content: [
@@ -546,119 +345,9 @@ class AtlassianMCPServer {
     };
   }
 
-  private async handleGetJiraTicketsByCreator(args: any) {
-    const { creatorEmail, project, createdAfter, createdBefore, maxResults } = args;
-    const result = await this.jiraService.searchTickets({
-      creator: creatorEmail,
-      project,
-      createdAfter,
-      createdBefore,
-      maxResults,
-    });
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleGetJiraTicketsInTimeframe(args: any) {
-    const { startDate, endDate, project, maxResults } = args;
-    const result = await this.jiraService.searchTickets({
-      createdAfter: startDate,
-      createdBefore: endDate,
-      project,
-      maxResults,
-    });
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleSearchConfluencePages(args: any) {
+  private async handleSearchConfluenceContent(args: any) {
     const options = ConfluenceSearchOptionsSchema.parse(args) as ConfluenceSearchOptionsType;
     const result = await this.confluenceService.searchPages(options);
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleGetConfluencePageLinks(args: any) {
-    const { query, spaceKey, limit } = args;
-    const links = await this.confluenceService.getPageLinks(query, spaceKey, limit);
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({ links }, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleGetJiraTicketsByTeamAndStatus(args: any) {
-    const { team, statuses, project, maxResults } = args;
-    
-    // Map team name to team identifier
-    const teamIdentifier = this.mapTeamNameToIdentifier(team);
-    
-    const result = await this.jiraService.searchTickets({
-      teamIdentifier,
-      status: statuses,
-      project,
-      maxResults,
-    });
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleSearchJiraTicketsByText(args: any) {
-    const { text, project, status, maxResults } = args;
-    
-    const result = await this.jiraService.searchTickets({
-      textSearch: text,
-      project,
-      status,
-      maxResults,
-    });
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async handleSearchJiraTicketsFlexible(args: any) {
-    const options = JiraSearchOptionsSchema.parse(args);
-    const result = await this.jiraService.searchTickets(options);
 
     return {
       content: [
