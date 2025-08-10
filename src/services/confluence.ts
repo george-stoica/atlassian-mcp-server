@@ -1,6 +1,15 @@
 import axios, { AxiosInstance } from 'axios';
 import { ConfluencePage, ConfluenceSearchResult, ConfluenceSearchOptions, ConfluenceSearchLinksResult } from '../types/atlassian';
-import { ConfluenceSearchOptionsSchema, ConfluenceSearchResultSchema, ConfluenceSearchLinksResultSchema } from '../schemas/atlassian';
+import { 
+  ConfluenceSearchOptionsSchema, 
+  ConfluenceSearchResultV2Schema, 
+  ConfluenceSearchLinksResultSchema,
+  FlexibleConfluenceResponseSchema
+} from '../schemas/atlassian';
+import { 
+  transformConfluenceV2Response, 
+  isV2Response 
+} from '../utils/confluence-transformers';
 
 export class ConfluenceService {
   private client: AxiosInstance;
@@ -34,42 +43,36 @@ export class ConfluenceService {
     const params: Record<string, string | number> = {
       cql: this.buildCQLQuery(validatedOptions as ConfluenceSearchOptions),
       limit: validatedOptions.limit,
-      start: validatedOptions.start,
     };
+
+    // Add cursor if provided (v2 pagination)
+    if (validatedOptions.cursor) {
+      params.cursor = validatedOptions.cursor;
+    }
 
     try {
       const response = await this.client.get('/pages', { params });
 
-      // Validate response
-      const apiResult = ConfluenceSearchResultSchema.parse(response.data);
-
-      // Return different formats based on outputFormat
-      if (validatedOptions.outputFormat === 'links_only') {
-        const links = apiResult.results.map(page => `${this.baseUrl}${page._links.webui}`);
-        return {
-          links,
-          total: apiResult.results.length,
-          start: validatedOptions.start,
-          limit: validatedOptions.limit,
-        };
-      }
-
-      // Transform API response to expected return type
-      const searchResult: ConfluenceSearchResult = {
-        results: apiResult.results,
-        start: apiResult.start,
-        limit: apiResult.limit,
-        size: apiResult.size,
-        _links: {
-          context: apiResult._links.context,
-          self: apiResult._links.self,
-          base: apiResult._links.base,
-          next: apiResult._links.next,
-          prev: apiResult._links.prev
+      // Try v2 schema first, fallback to flexible parsing
+      try {
+        const apiResult = ConfluenceSearchResultV2Schema.parse(response.data);
+        
+        if (validatedOptions.outputFormat === 'links_only') {
+          const links = apiResult.results.map((page: any) => `${this.baseUrl}${page._links.webui}`);
+          return {
+            links,
+            total: apiResult.results.length,
+            limit: validatedOptions.limit,
+          };
         }
-      };
 
-      return searchResult;
+        // Transform v2 response to unified format
+        return transformConfluenceV2Response(apiResult);
+      } catch (schemaError) {
+        // Fallback to flexible parsing
+        console.warn('V2 schema validation failed, using transformation:', (schemaError as Error).message);
+        return this.transformFlexibleResponse(response.data, validatedOptions);
+      }
     } catch (error) {
       if (axios.isAxiosError(error)) {
         throw new Error(`Confluence API error: ${error.response?.status} - ${error.response?.data?.message || error.message}`);
@@ -98,31 +101,16 @@ export class ConfluenceService {
     const params: Record<string, string | number> = {
       'space-key': spaceKey,
       limit,
-      start: 0,
     };
 
     try {
       const response = await this.client.get('/pages', { params });
 
-      // Validate response
-      const apiResult = ConfluenceSearchResultSchema.parse(response.data);
+      // Validate response using v2 schema
+      const apiResult = ConfluenceSearchResultV2Schema.parse(response.data);
       
-      // Transform API response to expected return type
-      const searchResult: ConfluenceSearchResult = {
-        results: apiResult.results,
-        start: apiResult.start,
-        limit: apiResult.limit,
-        size: apiResult.size,
-        _links: {
-          context: apiResult._links.context,
-          self: apiResult._links.self,
-          base: apiResult._links.base,
-          next: apiResult._links.next,
-          prev: apiResult._links.prev
-        }
-      };
-
-      return searchResult;
+      // Transform v2 response to unified format
+      return transformConfluenceV2Response(apiResult);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         throw new Error(`Confluence API error: ${error.response?.status} - ${error.response?.data?.message || error.message}`);
@@ -184,11 +172,67 @@ export class ConfluenceService {
 
     // Use provided spaceKey or default to DevOps space key
     const spaceKey = options.spaceKey ?? this.devopsSpaceKey;
-    conditions.push(`space.key = "${spaceKey}"`);
+    if (spaceKey) {
+      // v2 uses space.key syntax in CQL
+      conditions.push(`space.key = "${spaceKey}"`);
+    }
 
     // Add type filter
     conditions.push(`type = "${options.type}"`);
 
     return conditions.join(' AND ');
+  }
+
+  /**
+   * Transform flexible response when schema validation fails
+   */
+  private transformFlexibleResponse(response: any, options: any): ConfluenceSearchResult | ConfluenceSearchLinksResult {
+    // Validate with flexible schema
+    const flexibleResult = FlexibleConfluenceResponseSchema.parse(response);
+    
+    if (options.outputFormat === 'links_only') {
+      const links = flexibleResult.results.map((page: any) => 
+        `${this.baseUrl}${page._links?.webui || page.webui || ''}`
+      );
+      return {
+        links,
+        total: flexibleResult.results.length,
+        limit: options.limit,
+      };
+    }
+
+    // Detect if it's v2 format and transform accordingly
+    if (isV2Response(flexibleResult)) {
+      return transformConfluenceV2Response(flexibleResult);
+    } else {
+      // Fallback transformation for unknown format
+      return {
+        results: flexibleResult.results.map((page: any) => ({
+          id: page.id || '',
+          type: page.type || 'page',
+          status: page.status || 'current',
+          title: page.title || '',
+          spaceId: page.spaceId || page.space?.id || '',
+          parentId: page.parentId,
+          _links: {
+            webui: page._links?.webui || page.webui || '',
+            self: page._links?.self || page._links?.editui,
+            base: page._links?.base,
+            editui: page._links?.editui,
+            tinyui: page._links?.tinyui,
+          },
+          body: page.body,
+        })),
+        start: 0,
+        limit: options.limit,
+        size: flexibleResult.results.length,
+        _links: {
+          context: flexibleResult._links?.context || '',
+          self: flexibleResult._links?.self || flexibleResult._links?.base || '',
+          base: flexibleResult._links?.base,
+          next: flexibleResult._links?.next,
+        },
+      };
+    }
   }
 }

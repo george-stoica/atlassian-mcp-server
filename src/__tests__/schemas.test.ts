@@ -75,7 +75,6 @@ describe('Atlassian Schemas', () => {
         spaceKey: 'TEST',
         type: 'page' as const,
         limit: 25,
-        start: 0,
       };
 
       const result = ConfluenceSearchOptionsSchema.parse(validOptions);
@@ -94,7 +93,7 @@ describe('Atlassian Schemas', () => {
       const result = ConfluenceSearchOptionsSchema.parse(minimalOptions);
       expect(result.type).toBe('page');
       expect(result.limit).toBe(25);
-      expect(result.start).toBe(0);
+      expect(result.outputFormat).toBe('full');
     });
 
     it('should require query field', () => {
@@ -153,18 +152,11 @@ describe('Atlassian Schemas', () => {
       }).not.toThrow();
     });
 
-    it('should validate start minimum value', () => {
+    it('should validate cursor parameter', () => {
       expect(() => {
         ConfluenceSearchOptionsSchema.parse({ 
           query: 'test',
-          start: -1 
-        });
-      }).toThrow();
-
-      expect(() => {
-        ConfluenceSearchOptionsSchema.parse({ 
-          query: 'test',
-          start: 0 
+          cursor: 'some-cursor-value' 
         });
       }).not.toThrow();
     });
@@ -372,26 +364,16 @@ describe('Atlassian Schemas', () => {
     it('should validate valid Confluence page', () => {
       const validPage = {
         id: '123456',
-        type: 'page',
         status: 'current',
         title: 'Test Page Title',
-        space: {
-          id: '98765',
-          key: 'TEST',
-          name: 'Test Space'
-        },
+        spaceId: '98765',
         version: {
           number: 1,
-          when: '2024-01-01T10:00:00.000Z',
-          by: {
-            type: 'known',
-            accountId: 'user-123',
-            displayName: 'John Doe'
-          }
+          createdAt: '2024-01-01T10:00:00.000Z',
+          authorId: 'user-123'
         },
         _links: {
-          webui: '/spaces/TEST/pages/123456/Test+Page+Title',
-          self: 'https://test.atlassian.net/wiki/api/v2/pages/123456'
+          webui: '/spaces/TEST/pages/123456/Test+Page+Title'
         }
       };
 
@@ -402,26 +384,16 @@ describe('Atlassian Schemas', () => {
     it('should allow optional _expandable field', () => {
       const pageWithoutExpandable = {
         id: '123456',
-        type: 'page',
         status: 'current',
         title: 'Test Page Title',
-        space: {
-          id: '98765',
-          key: 'TEST',
-          name: 'Test Space'
-        },
+        spaceId: '98765',
         version: {
           number: 1,
-          when: '2024-01-01T10:00:00.000Z',
-          by: {
-            type: 'known',
-            accountId: 'user-123',
-            displayName: 'John Doe'
-          }
+          createdAt: '2024-01-01T10:00:00.000Z',
+          authorId: 'user-123'
         },
         _links: {
-          webui: '/spaces/TEST/pages/123456/Test+Page+Title',
-          self: 'https://test.atlassian.net/wiki/api/v2/pages/123456'
+          webui: '/spaces/TEST/pages/123456/Test+Page+Title'
         }
       };
 

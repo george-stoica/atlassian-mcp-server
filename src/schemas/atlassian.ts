@@ -88,64 +88,99 @@ export const JiraSearchResultSchema = z.object({
   issues: z.array(JiraTicketSchema),
 });
 
-// Confluence Schemas
+// Confluence Schemas for API v2
 export const ConfluenceSearchOptionsSchema = z.object({
   query: z.string().min(1),
   spaceKey: z.string().optional(),
   type: z.enum(['page', 'blogpost']).default('page'),
   outputFormat: z.enum(['full', 'links_only']).default('full'),
   limit: z.number().min(1).max(100).default(25),
-  start: z.number().min(0).default(0),
+  cursor: z.string().optional(), // v2 uses cursor-based pagination
 });
 
 export const ConfluenceSearchLinksResultSchema = z.object({
   links: z.array(z.string()),
   total: z.number(),
-  start: z.number(),
   limit: z.number(),
 });
 
-export const ConfluencePageSchema = z.object({
+// Confluence API v2 Page Schema
+export const ConfluencePageV2Schema = z.object({
   id: z.string(),
-  type: z.string(), // 'page' or 'blogpost'
-  status: z.string(), // 'current', 'trashed', etc.
+  status: z.string(), // "current", "trashed", etc.
   title: z.string(),
-  space: z.object({
-    id: z.string(),
-    key: z.string(),
-    name: z.string(),
-  }),
+  spaceId: z.string(), // Direct field in v2, not nested object
+  parentId: z.string().nullable().optional(), // Can be null in v2
+  parentType: z.string().nullable().optional(), // Can be null - "page" typically
+  position: z.number().nullable().optional(), // Can be null - position in hierarchy
+  authorId: z.string().optional(), // Author account ID
+  ownerId: z.string().optional(), // Owner account ID
+  lastOwnerId: z.string().nullable().optional(), // Can be null - last owner account ID
+  subtype: z.string().optional(), // Page subtype
+  createdAt: z.string().optional(), // ISO date string, different from v1
   version: z.object({
-    number: z.number(),
-    when: z.string(), // ISO date string
-    by: z.object({
-      type: z.string(), // 'user'
-      accountId: z.string(),
-      displayName: z.string(),
-    }),
-  }),
+    createdAt: z.string(), // Version creation date
+    message: z.string().optional(), // Version message
+    number: z.number(), // Version number
+    minorEdit: z.boolean().optional(), // Minor edit flag
+    authorId: z.string(), // Version author ID
+    ncsStepVersion: z.number().nullable().optional(), // Can be null - additional v2 field
+  }).optional(),
+  body: z.object({
+    storage: z.object({}).optional(),
+    atlas_doc_format: z.object({}).optional(),
+    view: z.object({}).optional(),
+  }).optional(),
   _links: z.object({
-    webui: z.string(),
-    self: z.string().optional(),
+    webui: z.string(), // Web UI link
+    editui: z.string().optional(), // Edit UI link
+    edituiv2: z.string().optional(), // Edit UI v2 link
+    tinyui: z.string().optional(), // Tiny UI link
+    base: z.string().optional(), // Base URL
   }),
-  // Optional fields for extended responses
-  body: z.object({}).optional(),
-  parentId: z.string().optional(),
-  ancestors: z.array(z.any()).optional(),
+  // Extended optional fields for detailed responses
+  labels: z.object({
+    results: z.array(z.object({
+      id: z.string(),
+      name: z.string(),
+      prefix: z.string().optional(),
+    })),
+    meta: z.object({
+      hasMore: z.boolean(),
+      cursor: z.string().optional(),
+    }),
+    _links: z.object({
+      self: z.string(),
+    }),
+  }).optional(),
+  properties: z.object({}).optional(),
+  operations: z.object({}).optional(),
+  likes: z.object({}).optional(),
+  versions: z.object({}).optional(),
+  isFavoritedByCurrentUser: z.boolean().optional(),
 });
 
-export const ConfluenceSearchResultSchema = z.object({
-  results: z.array(ConfluencePageSchema),
-  start: z.number(),
-  limit: z.number(),
-  size: z.number(),
+// Use v2 schema as the main schema
+export const ConfluencePageSchema = ConfluencePageV2Schema;
+
+// Confluence API v2 Search Result Schema
+export const ConfluenceSearchResultV2Schema = z.object({
+  results: z.array(ConfluencePageV2Schema),
   _links: z.object({
-    context: z.string(),
-    self: z.string(),
-    base: z.string(),
-    next: z.string().optional(),
-    prev: z.string().optional(),
+    next: z.string().optional(), // Cursor-based pagination
+    base: z.string().optional(), // Base URL
+    context: z.string().optional(), // Context path
   }),
+  // Note: v2 uses cursor-based pagination, not start/limit/size
+});
+
+// Use v2 schema as the main schema
+export const ConfluenceSearchResultSchema = ConfluenceSearchResultV2Schema;
+
+// Flexible schema for transformation fallback
+export const FlexibleConfluenceResponseSchema = z.object({
+  results: z.array(z.record(z.any())), // Accept any object structure
+  _links: z.record(z.string()).optional(),
 });
 
 // Configuration Schema
@@ -162,8 +197,23 @@ export const AtlassianConfigSchema = z.object({
   }),
 });
 
+// Error Response Schemas
+export const AtlassianErrorSchema = z.object({
+  errorMessages: z.array(z.string()).optional(),
+  errors: z.record(z.string()).optional(),
+  message: z.string().optional(),
+});
+
+export const HTTPErrorResponseSchema = z.object({
+  status: z.number(),
+  statusText: z.string(),
+  data: AtlassianErrorSchema.optional(),
+});
+
 // Export type inference
 export type JiraSearchOptionsInput = z.input<typeof JiraSearchOptionsSchema>;
 export type JiraSearchOptions = z.output<typeof JiraSearchOptionsSchema>;
 export type ConfluenceSearchOptionsInput = z.input<typeof ConfluenceSearchOptionsSchema>;
 export type ConfluenceSearchOptions = z.output<typeof ConfluenceSearchOptionsSchema>;
+export type ConfluencePageV2 = z.output<typeof ConfluencePageV2Schema>;
+export type ConfluenceSearchResultV2 = z.output<typeof ConfluenceSearchResultV2Schema>;
