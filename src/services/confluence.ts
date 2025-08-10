@@ -40,14 +40,107 @@ export class ConfluenceService {
     // Validate input
     const validatedOptions = ConfluenceSearchOptionsSchema.parse(options);
 
+    // Use space-specific endpoint if spaceKey is provided
+    const spaceKey = validatedOptions.spaceKey ?? this.devopsSpaceKey;
+    
+    if (spaceKey) {
+      return this.searchPagesInSpace(validatedOptions, spaceKey);
+    } else {
+      return this.searchPagesGlobal(validatedOptions);
+    }
+  }
+
+  /**
+   * Search for pages in a specific space
+   */
+  private async searchPagesInSpace(options: ConfluenceSearchOptions, spaceKey: string): Promise<ConfluenceSearchResult | ConfluenceSearchLinksResult> {
     const params: Record<string, string | number> = {
-      cql: this.buildCQLQuery(validatedOptions as ConfluenceSearchOptions),
-      limit: validatedOptions.limit,
+      'space-key': spaceKey,
+      limit: options.limit || 25,
     };
 
     // Add cursor if provided (v2 pagination)
-    if (validatedOptions.cursor) {
-      params.cursor = validatedOptions.cursor;
+    if (options.cursor) {
+      params.cursor = options.cursor;
+    }
+
+    try {
+      const response = await this.client.get('/pages', { params });
+
+      // Filter results by query text if provided
+      let filteredResults = response.data.results;
+      
+      if (options.query.trim()) {
+        const searchTerm = options.query.trim().toLowerCase();
+        filteredResults = response.data.results.filter((page: any) => {
+          const title = page.title?.toLowerCase() || '';
+          const body = page.body?.view?.value?.toLowerCase() || '';
+          return title.includes(searchTerm) || body.includes(searchTerm);
+        });
+      }
+
+      // Filter by type
+      if (options.type) {
+        filteredResults = filteredResults.filter((page: any) => page.type === options.type);
+      }
+
+      if (options.outputFormat === 'links_only') {
+        const links = filteredResults.map((page: any) => `${this.baseUrl}${page._links.webui}`);
+        return {
+          links,
+          total: filteredResults.length,
+          limit: options.limit || 25,
+        };
+      }
+
+      // Transform response to unified format
+      return {
+        results: filteredResults.map((page: any) => ({
+          id: page.id || '',
+          type: page.type || 'page',
+          status: page.status || 'current',
+          title: page.title || '',
+          spaceId: page.spaceId || '',
+          parentId: page.parentId,
+          _links: {
+            webui: page._links?.webui || '',
+            self: page._links?.self || '',
+            base: page._links?.base || '',
+            editui: page._links?.editui || '',
+            tinyui: page._links?.tinyui || '',
+          },
+          body: page.body,
+        })),
+        start: 0,
+        limit: options.limit || 25,
+        size: filteredResults.length,
+        _links: {
+          context: response.data._links?.context || '',
+          self: response.data._links?.self || '',
+          base: response.data._links?.base || '',
+          next: response.data._links?.next,
+        },
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw new Error(`Confluence API error: ${error.response?.status} - ${error.response?.data?.message || error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Search for pages globally using CQL
+   */
+  private async searchPagesGlobal(options: ConfluenceSearchOptions): Promise<ConfluenceSearchResult | ConfluenceSearchLinksResult> {
+    const params: Record<string, string | number> = {
+      cql: this.buildCQLQuery(options),
+      limit: options.limit || 25,
+    };
+
+    // Add cursor if provided (v2 pagination)
+    if (options.cursor) {
+      params.cursor = options.cursor;
     }
 
     try {
@@ -57,12 +150,12 @@ export class ConfluenceService {
       try {
         const apiResult = ConfluenceSearchResultV2Schema.parse(response.data);
         
-        if (validatedOptions.outputFormat === 'links_only') {
+        if (options.outputFormat === 'links_only') {
           const links = apiResult.results.map((page: any) => `${this.baseUrl}${page._links.webui}`);
           return {
             links,
             total: apiResult.results.length,
-            limit: validatedOptions.limit,
+            limit: options.limit || 25,
           };
         }
 
@@ -71,7 +164,7 @@ export class ConfluenceService {
       } catch (schemaError) {
         // Fallback to flexible parsing
         console.warn('V2 schema validation failed, using transformation:', (schemaError as Error).message);
-        return this.transformFlexibleResponse(response.data, validatedOptions);
+        return this.transformFlexibleResponse(response.data, options);
       }
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -181,6 +274,13 @@ export class ConfluenceService {
     conditions.push(`type = "${options.type}"`);
 
     return conditions.join(' AND ');
+  }
+
+  /**
+   * Debug method to expose CQL query generation
+   */
+  public debugCQLQuery(options: ConfluenceSearchOptions): string {
+    return this.buildCQLQuery(options);
   }
 
   /**

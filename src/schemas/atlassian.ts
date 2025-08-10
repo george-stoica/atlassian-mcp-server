@@ -90,7 +90,7 @@ export const JiraSearchResultSchema = z.object({
 
 // Confluence Schemas for API v2
 export const ConfluenceSearchOptionsSchema = z.object({
-  query: z.string().min(1),
+  query: z.string(), // Allow empty string for getting all pages in a space
   spaceKey: z.string().optional(),
   type: z.enum(['page', 'blogpost']).default('page'),
   outputFormat: z.enum(['full', 'links_only']).default('full'),

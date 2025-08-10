@@ -267,6 +267,10 @@ class AtlassianMCPServer {
               type: 'string',
               description: 'Text to search for in pages',
             },
+            spaceKey: {
+              type: 'string',
+              description: 'Confluence space key to search in (defaults to DEVOPS space if not provided)',
+            },
             type: {
               type: 'string',
               enum: ['page', 'blogpost'],
@@ -346,6 +350,11 @@ class AtlassianMCPServer {
   }
 
   private async handleSearchConfluenceContent(args: any) {
+    // Ensure we default to DEVOPS space if no spaceKey is provided
+    if (!args.spaceKey) {
+      args.spaceKey = process.env.DEVOPS_SPACE_KEY || 'DEVOPS';
+    }
+    
     const options = ConfluenceSearchOptionsSchema.parse(args) as ConfluenceSearchOptionsType;
     const result = await this.confluenceService.searchPages(options);
 
