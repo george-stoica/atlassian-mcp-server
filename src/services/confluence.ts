@@ -9,7 +9,7 @@ export class ConfluenceService {
 
   constructor(baseUrl: string, email: string, apiToken: string, devopsSpaceKey: string) {
     this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
-    this.devopsSpaceKey = devopsSpaceKey;
+    this.devopsSpaceKey = devopsSpaceKey; // Used as default when no spaceKey is provided
     this.client = axios.create({
       baseURL: `${this.baseUrl}/wiki/api/v2`,
       auth: {
@@ -57,8 +57,15 @@ export class ConfluenceService {
       // Transform API response to expected return type
       const searchResult: ConfluenceSearchResult = {
         results: apiResult.results,
+        start: apiResult.start,
+        limit: apiResult.limit,
+        size: apiResult.size,
         _links: {
-          base: apiResult._links.base || `${this.baseUrl}/wiki`
+          context: apiResult._links.context,
+          self: apiResult._links.self,
+          base: apiResult._links.base,
+          next: apiResult._links.next,
+          prev: apiResult._links.prev
         }
       };
 
@@ -103,8 +110,15 @@ export class ConfluenceService {
       // Transform API response to expected return type
       const searchResult: ConfluenceSearchResult = {
         results: apiResult.results,
+        start: apiResult.start,
+        limit: apiResult.limit,
+        size: apiResult.size,
         _links: {
-          base: apiResult._links.base || `${this.baseUrl}/wiki`
+          context: apiResult._links.context,
+          self: apiResult._links.self,
+          base: apiResult._links.base,
+          next: apiResult._links.next,
+          prev: apiResult._links.prev
         }
       };
 
@@ -158,7 +172,7 @@ export class ConfluenceService {
 
   /**
    * Build CQL (Confluence Query Language) query from search options
-   * Always uses the DevOps space key
+   * Uses provided spaceKey or defaults to the DevOps space key
    */
   private buildCQLQuery(options: ConfluenceSearchOptions): string {
     const conditions: string[] = [];
@@ -168,8 +182,9 @@ export class ConfluenceService {
       conditions.push(`text ~ "${options.query.trim()}"`);
     }
 
-    // Always use the DevOps space key
-    conditions.push(`space.key = "${this.devopsSpaceKey}"`);
+    // Use provided spaceKey or default to DevOps space key
+    const spaceKey = options.spaceKey ?? this.devopsSpaceKey;
+    conditions.push(`space.key = "${spaceKey}"`);
 
     // Add type filter
     conditions.push(`type = "${options.type}"`);

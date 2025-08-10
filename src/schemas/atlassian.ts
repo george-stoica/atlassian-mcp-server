@@ -107,45 +107,31 @@ export const ConfluenceSearchLinksResultSchema = z.object({
 
 export const ConfluencePageSchema = z.object({
   id: z.string(),
-  parentId: z.string().nullable(),
-  spaceId: z.string(),
-  ownerId: z.string(),
-  lastOwnerId: z.string().nullable(),
-  createdAt: z.string(),
-  authorId: z.string(),
-  parentType: z.string().nullable(),
-  status: z.string(),
+  type: z.string(), // 'page' or 'blogpost'
+  status: z.string(), // 'current', 'trashed', etc.
   title: z.string(),
-  position: z.any().nullable(),
-  body: z.object({}).optional(),
-  type: z.string().optional(),
   space: z.object({
     id: z.string(),
     key: z.string(),
     name: z.string(),
-    type: z.string(),
-  }).optional(),
+  }),
   version: z.object({
     number: z.number(),
-    message: z.string(),
-    minorEdit: z.boolean(),
-    authorId: z.string(),
-    createdAt: z.string(),
-    ncsStepVersion: z.any().nullable(),
-    when: z.string().optional(),
+    when: z.string(), // ISO date string
     by: z.object({
-      type: z.string(),
+      type: z.string(), // 'user'
       accountId: z.string(),
       displayName: z.string(),
-    }).optional(),
+    }),
   }),
   _links: z.object({
-    editui: z.string(),
     webui: z.string(),
-    edituiv2: z.string(),
-    tinyui: z.string(),
     self: z.string().optional(),
   }),
+  // Optional fields for extended responses
+  body: z.object({}).optional(),
+  parentId: z.string().optional(),
+  ancestors: z.array(z.any()).optional(),
 });
 
 export const ConfluenceSearchResultSchema = z.object({
@@ -156,8 +142,9 @@ export const ConfluenceSearchResultSchema = z.object({
   _links: z.object({
     context: z.string(),
     self: z.string(),
+    base: z.string(),
     next: z.string().optional(),
-    base: z.string().optional(),
+    prev: z.string().optional(),
   }),
 });
 

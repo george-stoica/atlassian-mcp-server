@@ -85,38 +85,43 @@ export interface JiraSearchOptions {
 
 export interface ConfluencePage {
   id: string;
-  parentId: string | null;
-  spaceId: string;
-  ownerId: string;
-  lastOwnerId: string | null;
-  createdAt: string;
-  authorId: string;
-  parentType: string | null;
+  type: string;
   status: string;
   title: string;
-  position?: any | null;
-  body?: {};
+  space: {
+    id: string;
+    key: string;
+    name: string;
+  };
   version: {
     number: number;
-    message: string;
-    minorEdit: boolean;
-    authorId: string;
-    createdAt: string;
-    ncsStepVersion?: any | null;
+    when: string;
+    by: {
+      type: string;
+      accountId: string;
+      displayName: string;
+    };
   };
   _links: {
-    editui: string;
     webui: string;
-    edituiv2: string;
-    tinyui: string;
+    self?: string;
   };
+  body?: Record<string, any>;
+  parentId?: string;
+  ancestors?: any[];
 }
 
 export interface ConfluenceSearchResult {
   results: ConfluencePage[];
+  start: number;
+  limit: number;
+  size: number;
   _links: {
-    next?: string;
+    context: string;
+    self: string;
     base: string;
+    next?: string;
+    prev?: string;
   };
 }
 

@@ -23,35 +23,37 @@ describe('ConfluenceService', () => {
   // Mock response data
   const mockConfluencePage: ConfluencePage = {
     id: '123456',
-    parentId: null,
-    spaceId: '98765',
-    ownerId: 'user-123',
-    lastOwnerId: null,
-    createdAt: '2024-01-01T10:00:00.000Z',
-    authorId: 'user-123',
-    parentType: null,
+    type: 'page',
     status: 'current',
     title: 'Test Page Title',
-    position: null,
+    space: {
+      id: '98765',
+      key: 'DEVOPS',
+      name: 'DevOps Space'
+    },
     version: {
       number: 1,
-      message: 'Initial version',
-      minorEdit: false,
-      authorId: 'user-123',
-      createdAt: '2024-01-01T10:00:00.000Z',
-      ncsStepVersion: null
+      when: '2024-01-01T10:00:00.000Z',
+      by: {
+        type: 'user',
+        accountId: 'user-123',
+        displayName: 'Test User'
+      }
     },
     _links: {
-      editui: '/pages/edit-v2/123456',
-      webui: '/spaces/TEST/pages/123456/Test+Page+Title',
-      edituiv2: '/pages/edit-v2/123456',
-      tinyui: '/x/123456'
+      webui: '/spaces/DEVOPS/pages/123456/Test+Page+Title',
+      self: 'https://test.atlassian.net/wiki/api/v2/pages/123456'
     }
   };
 
   const mockSearchResult: ConfluenceSearchResult = {
     results: [mockConfluencePage],
+    start: 0,
+    limit: 25,
+    size: 1,
     _links: {
+      context: 'https://test.atlassian.net/wiki',
+      self: 'https://test.atlassian.net/wiki/api/v2/pages',
       base: 'https://test.atlassian.net/wiki'
     }
   };
@@ -59,16 +61,17 @@ describe('ConfluenceService', () => {
   // Mock search result with pagination info for API responses
   const mockApiSearchResult = {
     results: [{
-      ...mockConfluencePage,
+      id: '123456',
       type: 'page',
+      status: 'current',
+      title: 'Test Page Title',
       space: { 
         id: '98765',
         key: 'DEVOPS', 
-        name: 'DevOps Space',
-        type: 'global'
+        name: 'DevOps Space'
       },
       version: {
-        ...mockConfluencePage.version,
+        number: 1,
         when: '2024-01-01T10:00:00.000Z',
         by: { 
           type: 'user',
@@ -77,7 +80,7 @@ describe('ConfluenceService', () => {
         }
       },
       _links: {
-        ...mockConfluencePage._links,
+        webui: '/spaces/DEVOPS/pages/123456/Test+Page+Title',
         self: 'https://test.atlassian.net/wiki/api/v2/pages/123456'
       }
     }],
@@ -184,7 +187,7 @@ describe('ConfluenceService', () => {
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/pages', {
         params: {
-          cql: 'text ~ "test search" AND space.key = "DEVOPS" AND type = "page"',
+          cql: 'text ~ "test search" AND space.key = "TEST" AND type = "page"',
           limit: 25,
           start: 0,
         },
@@ -432,7 +435,7 @@ describe('ConfluenceService', () => {
         type: 'page'
       });
 
-      expect(query).toBe('text ~ "test search" AND space.key = "DEVOPS" AND type = "page"');
+      expect(query).toBe('text ~ "test search" AND space.key = "TEST" AND type = "page"');
     });
 
     it('should build CQL query without space key', () => {

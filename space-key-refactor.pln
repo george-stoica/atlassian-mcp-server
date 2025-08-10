@@ -1,0 +1,201 @@
+# Space Key Refactor Plan
+
+## Problem Analysis
+
+Looking at the test failures and the current code, the issue is that the current implementation always uses the `devopsSpaceKey` regardless of what's passed in the `spaceKey` parameter, but the tests expect different behavior where the DEVOPS space key should be a default for the spaceKey parameter.
+
+### Test Failures Identified:
+
+1. **CQL Query Building Issues**: Tests are expecting that when no `spaceKey` is provided, no space filter should be added to the CQL query, but when a `spaceKey` is provided, it should be used instead of the default DEVOPS space key.
+
+2. **Schema Validation Issues**: Some tests are passing numbers for `spaceKey` when the schema expects a string.
+
+3. **Mock Data Structure Mismatch**: The mock response structure doesn't match the actual Confluence API response format.
+
+## Solution Plan
+
+### 1. Fix the `buildCQLQuery` Method
+
+**Current behavior**: Always uses `devopsSpaceKey`
+**Expected behavior**: 
+- If `spaceKey` is provided in options, use it
+- If no `spaceKey` is provided, use `devopsSpaceKey` as default
+- If `spaceKey` is explicitly set to empty string or null, don't add space filter
+
+**Changes needed in `src/services/confluence.ts`**:
+```typescript
+private buildCQLQuery(options: ConfluenceSearchOptions): string {
+  const conditions: string[] = [];
+
+  // Add text search condition
+  if (options.query.trim()) {
+    conditions.push(`text ~ "${options.query.trim()}"`);
+  }
+
+  // Use provided spaceKey or default to DevOps space key
+  const spaceKey = options.spaceKey ?? this.devopsSpaceKey;
+  if (spaceKey) {
+    conditions.push(`space.key = "${spaceKey}"`);
+  }
+
+  // Add type filter
+  conditions.push(`type = "${options.type}"`);
+
+  return conditions.join(' AND ');
+}
+```
+
+**Update method documentation**:
+```typescript
+/**
+ * Build CQL (Confluence Query Language) query from search options
+ * Uses provided spaceKey or defaults to the DevOps space key
+ */
+```
+
+### 2. Schema Updates
+
+**Current schema**: `spaceKey: z.string().optional()`
+**No schema changes needed** - the current schema is correct, but the service logic needs to handle the default properly.
+
+### 3. Fix Test Expectations
+
+**File**: `src/__tests__/confluence.test.ts`
+
+#### Tests expecting no space filter when no spaceKey provided:
+- **"should search pages with basic query"**: Update expectation to use DEVOPS as default
+- **"should search for blog posts"**: Update expectation to use DEVOPS as default
+- **"should search pages by text query"**: Update expectation to use DEVOPS as default
+
+#### Tests expecting specific space keys:
+- **"should search pages with space filter"**: Update expectation to use the provided spaceKey (TEST) instead of DEVOPS
+
+#### Tests passing numbers for spaceKey:
+- **"should search pages by text query with custom limit"**: Fix the spaceKey parameter to be a string
+- **"should get page links with custom limit"**: Fix the spaceKey parameter to be a string
+
+#### buildCQLQuery tests:
+- **"should build CQL query with all conditions"**: Update to expect the provided spaceKey (TEST) instead of DEVOPS
+- **"should build CQL query without space key"**: Update to expect DEVOPS as default
+- **"should handle empty query text"**: Update to expect DEVOPS as default
+
+### 4. Fix Mock Data Structure
+
+**File**: `src/__tests__/confluence.test.ts`
+
+The mock API response structure needs to match the actual Confluence API v2 response format:
+
+**Update `mockApiSearchResult`**:
+```typescript
+const mockApiSearchResult = {
+  results: [{
+    id: '123456',
+    type: 'page',
+    status: 'current',
+    title: 'Test Page Title',
+    space: { 
+      id: '98765',
+      key: 'DEVOPS', 
+      name: 'DevOps Space'
+    },
+    version: {
+      number: 1,
+      when: '2024-01-01T10:00:00.000Z',
+      by: { 
+        type: 'user',
+        accountId: 'user-123', 
+        displayName: 'Test User' 
+      }
+    },
+    _links: {
+      webui: '/spaces/DEVOPS/pages/123456/Test+Page+Title',
+      self: 'https://test.atlassian.net/wiki/api/v2/pages/123456'
+    }
+  }],
+  start: 0,
+  limit: 25,
+  size: 1,
+  _links: {
+    context: 'https://test.atlassian.net/wiki',
+    self: 'https://test.atlassian.net/wiki/api/v2/pages',
+    base: 'https://test.atlassian.net/wiki'
+  }
+};
+```
+
+**Remove deprecated fields from `mockConfluencePage`**:
+- Remove: `parentId`, `spaceId`, `ownerId`, `lastOwnerId`, `createdAt`, `authorId`, `parentType`, `position`
+- Remove old version fields: `message`, `minorEdit`, `authorId`, `createdAt`, `ncsStepVersion`
+- Remove old `_links` fields: `editui`, `edituiv2`, `tinyui`
+
+### 5. Specific Test Case Fixes
+
+#### Test: "should search pages with basic query"
+```typescript
+// Current expectation (WRONG)
+cql: 'text ~ "test search" AND space.key = "DEVOPS" AND type = "page"'
+
+// Should remain the same since no spaceKey provided, DEVOPS should be default
+cql: 'text ~ "test search" AND space.key = "DEVOPS" AND type = "page"'
+```
+
+#### Test: "should search pages with space filter"
+```typescript
+// Current expectation (WRONG)
+cql: 'text ~ "test search" AND space.key = "DEVOPS" AND type = "page"'
+
+// Should use provided spaceKey
+cql: 'text ~ "test search" AND space.key = "TEST" AND type = "page"'
+```
+
+#### Test: "should search pages by text query with custom limit"
+```typescript
+// Fix the test data (WRONG)
+await confluenceService.searchPagesByText('test query', 10);
+
+// Should not pass spaceKey to searchPagesByText as it has fixed logic
+// The issue is in the test expectation, not the call
+```
+
+#### Test: "should get page links with custom limit"  
+```typescript
+// Fix the test data (WRONG)
+await confluenceService.getPageLinks('test query', 10);
+
+// Should not pass spaceKey to getPageLinks as it has fixed logic
+// The issue is in the test expectation, not the call
+```
+
+### 6. Update Method Documentation
+
+Update comments and documentation to clarify that `devopsSpaceKey` is used as a default when no `spaceKey` is provided in the options.
+
+**Files to update**:
+- `src/services/confluence.ts` - method comments
+- Constructor comment to clarify the default behavior
+
+## Implementation Order
+
+1. **Fix `buildCQLQuery` method** - Core logic change
+2. **Update method documentation** - Clarify behavior
+3. **Fix test mock data structure** - Match API response format
+4. **Update test expectations** - Match new behavior
+5. **Fix test data types** - String vs number issues
+6. **Run tests and verify** - Ensure all tests pass
+
+## Validation
+
+After implementing these changes:
+1. All Confluence tests should pass
+2. The spaceKey parameter should work as expected (provided value or default to DEVOPS)
+3. Mock data should match real API response structure
+4. Schema validation should work correctly
+
+## Files Modified
+
+- `src/services/confluence.ts` - Core logic and documentation
+- `src/__tests__/confluence.test.ts` - Test expectations and mock data
+
+## Risk Assessment
+
+**Low Risk**: These changes are primarily fixing test expectations to match the intended behavior and correcting the default parameter logic. The API behavior remains the same for existing consumers.
